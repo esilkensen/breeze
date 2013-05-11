@@ -1,0 +1,41 @@
+{
+
+open (import Str) { concat };
+
+ReviewEnt = {:
+  paperId : Int;          // Paper number
+  paper   : RefOf String; // Paper content
+  review  : RefOf String; // Notebook
+:};
+
+User = {:
+  name        : Int;       // User name
+  password    : String;    // Password
+  conflicts   : SeqOf Int; // Conflicting papers
+  assignments : SeqOf Int; // Papers assigned to review
+:};
+
+reviewEntries = ref public [];
+users = ref public [];
+
+fun newReviewEnt {id:Int} {content:String} : ReviewEnt = {
+  p = newPrin (concat "P" (stringOfInt id));
+  r = newPrin (concat "R" (stringOfInt id));
+  paper = ref (fullLabel [] [[p.prin]]) content;
+  review = ref (fullLabel [[r.prin]] [[r.prin]]) "";
+  {| paperId = id; paper = paper; review = review; |}
+};
+
+// Create a new review entry for a paper and return its id.
+fun addPaper {content:String} : Int = {
+  id = 1 + length (!reviewEntries);
+  ent = newReviewEnt id content;
+  reviewEntries := ent :: (!reviewEntries);
+  id
+};
+
+id1 = addPaper "Flexible Dynamic...";
+id2 = addPaper "A Static...";
+test (last (!reviewEntries)).paperId ==> id1;
+
+}
