@@ -1,0 +1,13 @@
+{
+
+open import LambdaChair { addPaper addUser addAssignment };
+
+addUser "Alice" "password";
+
+p1 = addPaper "Flexible Dynamic...";
+p2 = addPaper "A Static...";
+
+addAssignment "Alice" p1;
+addAssignment "Alice" p2;
+
+}
