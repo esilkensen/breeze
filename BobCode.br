@@ -1,0 +1,24 @@
+{
+
+open import LambdaChair { findPaper };
+
+module BobCode
+interface
+{:
+  mainReview : Unit => Unit;
+:}
+implementation
+{|
+
+fun mainReview {arg:Unit} : Unit = {
+  p1 = findPaper "Flexible Dynamic...";
+  p2 = findPaper "A Static....";
+
+  // appendToReview p2 "Hmm, IFC..";
+  // readReview p2;
+  // readReview p1;
+};
+
+|}
+
+}
