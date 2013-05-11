@@ -5,16 +5,23 @@ open import Str { concat };
 module LambdaChair
 interface
 {:
-  // Admin actions
+  // System administrator interface
   addPaper : String => Int;
   addUser : String => String => Unit;
   addAssignment : String => Int => Unit;
   addConflict : String => Int => Unit;
+  asUser : String => (Unit => Unit) => Unit;
+
+  // Reviewer interface
+  findPaper : String => Int;
+  //readPaper : Int => String;
+  //readReview : Int => Unit;
+  //appendToReview : Int => String => Unit;
 :}
 implementation 
 {|
 
-// Private interface:
+// Private interface ///////////////////////////////////////////////////
 
 ReviewEnt = {:
   paperId : Int;          // Paper number
@@ -53,6 +60,15 @@ rec fun findUser {name:String} {users:SeqOf User} : OptOf User = {
   }
 };
 
+rec fun findReview {paper:String} {reviews:SeqOf ReviewEnt} : OptOf ReviewEnt = {
+  case reviews of {
+    | `Nil => `None
+    | `Cons r rs => if r.paper == paper
+                    then `Some r
+		    else findReview paper rs
+  }
+};
+
 rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
   case users of {
     | `Nil => `Nil
@@ -62,12 +78,12 @@ rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
   }
 };
 
-// Public interface:
+// Public interface ////////////////////////////////////////////////////
 
 // Create a new review entry for a paper and return its id.
-fun addPaper {content:String} : Int = {
+fun addPaper {title:String} : Int = {
   id = 1 + length (!reviewEntries);
-  ent = newReviewEnt id content;
+  ent = newReviewEnt id title;
   reviewEntries := ent :: (!reviewEntries);
   id
 };
@@ -109,6 +125,20 @@ fun addConflict {name:String} {id:Int} : Unit = {
                                    conflicts = id :: u.conflicts;
                                    assignments = u.assignments
                                  |} (!users)
+  }
+};
+
+// TODO
+fun asUser {name:String} {mainReview:Unit => Unit} : Unit = {
+  test name ==> ?;
+  ()
+};
+
+// Return the id of the given paper. 
+fun findPaper {paper:String} : Int = {
+  case (findReview paper (!reviewEntries)) of {
+    | `None => mkNav "Paper not found"
+    | `Some r => r.paperId
   }
 };
 
