@@ -1,6 +1,20 @@
 {
 
-open (import Str) { concat };
+open import Str { concat };
+
+module LambdaChair
+interface
+{:
+  // Admin actions
+  addPaper : String => Int;
+  addUser : String => String => Unit;
+  addAssignment : String => Int => Unit;
+  addConflict : String => Int => Unit;
+:}
+implementation 
+{|
+
+// Private interface:
 
 ReviewEnt = {:
   paperId : Int;          // Paper number
@@ -9,7 +23,7 @@ ReviewEnt = {:
 :};
 
 User = {:
-  name        : Int;       // User name
+  name        : String;    // User name
   password    : String;    // Password
   conflicts   : SeqOf Int; // Conflicting papers
   assignments : SeqOf Int; // Papers assigned to review
@@ -26,6 +40,30 @@ fun newReviewEnt {id:Int} {content:String} : ReviewEnt = {
   {| paperId = id; paper = paper; review = review; |}
 };
 
+fun newUser {name:String} {password:String} : User = {
+  {| name = name; password = password; conflicts = []; assignments = [] |}
+};
+
+rec fun findUser {name:String} {users:SeqOf User} : OptOf User = {
+  case users of {
+    | `Nil => `None
+    | `Cons u us => if u.name == name
+                    then `Some u
+                    else findUser name us
+  }
+};
+
+rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
+  case users of {
+    | `Nil => `Nil
+    | `Cons u us => if u.name == user.name
+                    then user :: users
+		    else u :: (replaceUser user us)
+  }
+};
+
+// Public interface:
+
 // Create a new review entry for a paper and return its id.
 fun addPaper {content:String} : Int = {
   id = 1 + length (!reviewEntries);
@@ -34,8 +72,62 @@ fun addPaper {content:String} : Int = {
   id
 };
 
-id1 = addPaper "Flexible Dynamic...";
-id2 = addPaper "A Static...";
-test (last (!reviewEntries)).paperId ==> id1;
+// Create a new user entry for a given name and password.
+fun addUser {name:String} {password:String} : Unit = {
+  case (findUser name (!users)) of {
+    | `None => users := (newUser name password) :: (!users)
+    | `Some u => mkNav "User already exists"
+  }
+};
+
+// Assign a user to review a paper.  The user must not already be in
+// conflict with the paper.
+fun addAssignment {name:String} {id:Int} : Unit = {
+  case (findUser name (!users)) of {
+    | `None => mkNav "User not found"
+    | `Some u => if (member (\x => x == id) u.conflicts)
+                 then mkNav "User in conflict with paper"
+                 else users := replaceUser {|
+                                   name = u.name;
+                                   password = u.password;
+                                   conflicts = u.conflicts;
+                                   assignments = id :: u.assignments
+                                 |} (!users)
+  }
+};
+
+// Mark a user as being in conflict with a paper.  The user must not
+// already be assigned to the paper.
+fun addConflict {name:String} {id:Int} : Unit = {
+  case (findUser name (!users)) of {
+    | `None => mkNav "User not found"
+    | `Some u => if (member (\x => x == id) u.assignments)
+                 then mkNav "User assigned to paper"
+                 else users := replaceUser {|
+                                   name = u.name;
+                                   password = u.password;
+                                   conflicts = id :: u.conflicts;
+                                   assignments = u.assignments
+                                 |} (!users)
+  }
+};
+
+// Debugging interface:
+
+fun getAssignments {name:String} : SeqOf Int = {
+  case (findUser name (!users)) of {
+    | `None => mkNav "User not found"
+    | `Some u => u.assignments
+  }
+};
+
+fun getConflicts {name:String} : SeqOf Int = {
+  case (findUser name (!users)) of {
+    | `None => mkNav "User not found"
+    | `Some u => u.conflicts
+  }
+};
+
+|}
 
 }
