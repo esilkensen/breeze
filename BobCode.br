@@ -11,12 +11,13 @@ implementation
 {|
 
 fun mainReview {arg:Unit} : Unit = {
-  p1 = findPaper "Flexible Dynamic...";
-  p2 = findPaper "A Static....";
+  p1 = findPaper "All Your IFCException Are Belong To Us";
+  p2 = findPaper "Flexible DIFC in the Presence of Exceptions";
 
   // appendToReview p2 "Hmm, IFC..";
   // readReview p2;
   // readReview p1;
+  ()
 };
 
 |}

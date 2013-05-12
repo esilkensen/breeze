@@ -6,7 +6,7 @@ module LambdaChair
 interface
 {:
   // System administrator interface
-  addPaper : String => Int;
+  addPaper : String => String => Int;
   addUser : String => String => Unit;
   addAssignment : String => Int => Unit;
   addConflict : String => Int => Unit;
@@ -14,19 +14,18 @@ interface
 
   // Reviewer interface
   findPaper : String => Int;
-  //readPaper : Int => String;
+  readPaper : Int => String;
   //readReview : Int => Unit;
   //appendToReview : Int => String => Unit;
 :}
 implementation 
 {|
 
-// Private interface ///////////////////////////////////////////////////
-
 ReviewEnt = {:
-  paperId : Int;          // Paper number
-  paper   : RefOf String; // Paper content
-  review  : RefOf String; // Notebook
+  paperId    : Int;          // Paper number
+  paperTitle : String;       // Paper title
+  paper      : RefOf String; // Paper content
+  review     : RefOf String; // Notebook
 :};
 
 User = {:
@@ -39,12 +38,24 @@ User = {:
 reviewEntries = ref public [];
 users = ref public [];
 
-fun newReviewEnt {id:Int} {content:String} : ReviewEnt = {
+paperPrins = ref public [];
+reviewPrins = ref public [];
+
+rec fun listRef lst ind = {
+  case lst of {
+    | `Nil => `None
+    | `Cons x xs => if ind == 0 then `Some x else listRef xs (ind - 1)
+  }
+};
+
+fun newReviewEnt {id:Int} {title:String} {content:String} : ReviewEnt = {
   p = newPrin (concat "P" (stringOfInt id));
   r = newPrin (concat "R" (stringOfInt id));
+  paperPrins := (!paperPrins) ++ [p];
+  reviewPrins := (!reviewPrins) ++ [r];
   paper = ref (fullLabel [] [[p.prin]]) content;
   review = ref (fullLabel [[r.prin]] [[r.prin]]) "";
-  {| paperId = id; paper = paper; review = review; |}
+  {| paperId = id; paperTitle = title; paper = content; review = review; |}
 };
 
 fun newUser {name:String} {password:String} : User = {
@@ -60,12 +71,21 @@ rec fun findUser {name:String} {users:SeqOf User} : OptOf User = {
   }
 };
 
-rec fun findReview {paper:String} {reviews:SeqOf ReviewEnt} : OptOf ReviewEnt = {
+rec fun findReview {id:Int} {reviews:SeqOf ReviewEnt} : OptOf ReviewEnt = {
   case reviews of {
     | `Nil => `None
-    | `Cons r rs => if r.paper == paper
+    | `Cons r rs => if r.paperId == id
                     then `Some r
-		    else findReview paper rs
+		    else findReview id rs
+  }
+};
+
+rec fun findPaperId {title:String} {reviews:SeqOf ReviewEnt} : OptOf Int = {
+  case reviews of {
+    | `Nil => `None
+    | `Cons r rs => if r.paperTitle == title
+                    then `Some r.paperId
+		    else findPaperId title rs
   }
 };
 
@@ -78,12 +98,24 @@ rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
   }
 };
 
-// Public interface ////////////////////////////////////////////////////
+fun getAssignments {name:String} : SeqOf Int = {
+  case (findUser name (!users)) of {
+    | `None => mkNav "User not found"
+    | `Some u => u.assignments
+  }
+};
+
+fun getConflicts {name:String} : SeqOf Int = {
+  case (findUser name (!users)) of {
+    | `None => mkNav "User not found"
+    | `Some u => u.conflicts
+  }
+};
 
 // Create a new review entry for a paper and return its id.
-fun addPaper {title:String} : Int = {
+fun addPaper {title:String} {content:String} : Int = {
   id = 1 + length (!reviewEntries);
-  ent = newReviewEnt id title;
+  ent = newReviewEnt id title content;
   reviewEntries := ent :: (!reviewEntries);
   id
 };
@@ -128,34 +160,36 @@ fun addConflict {name:String} {id:Int} : Unit = {
   }
 };
 
-// TODO
+// Execute code with the current pc set to (True, R1 /\ ... /\ Rn)
+// where R1 ... Rn are the principals corresponding corresponding to
+// the review entries for each paper the user is assigned to review.
 fun asUser {name:String} {mainReview:Unit => Unit} : Unit = {
-  test name ==> ?;
-  ()
+  rs = map (\id => case listRef (!reviewPrins) (id - 1) of {
+                     | `Some r => r
+                   })
+           (sort (\x y => x < y) (getAssignments name));
+  userPc = fullLabel [] (map (\r => [r.prin]) rs);
+  pc = getPc ();
+  lowerPcTo (foldl with emptyAuth (map (\r => r.pcAuth) rs)) userPc;
+  mainReview ();
+  raisePcTo pc;
 };
 
 // Return the id of the given paper. 
-fun findPaper {paper:String} : Int = {
-  case (findReview paper (!reviewEntries)) of {
-    | `None => mkNav "Paper not found"
-    | `Some r => r.paperId
-  }
+fun findPaper {title:String} : Int = {
+  {
+    raisePcTo public;
+    case (findPaperId title (!reviewEntries)) of {
+      | `None => mkNav "Paper not found"
+      | `Some id => id
+    }
+  }@public
 };
 
-// Debugging interface:
-
-fun getAssignments {name:String} : SeqOf Int = {
-  case (findUser name (!users)) of {
-    | `None => mkNav "User not found"
-    | `Some u => u.assignments
-  }
-};
-
-fun getConflicts {name:String} : SeqOf Int = {
-  case (findUser name (!users)) of {
-    | `None => mkNav "User not found"
-    | `Some u => u.conflicts
-  }
+// Read and return the content of a paper.
+fun readPaper {id:Int} : String = {
+  // TODO
+  ""
 };
 
 |}

@@ -6,8 +6,10 @@ Bob = import BobCode;
 
 addUser "Alice" "password";
 
-p1 = addPaper "Flexible Dynamic...";
-p2 = addPaper "A Static...";
+p1 = addPaper "All Your IFCException Are Belong To Us"
+              "Existing designs for fine-grained, dynamic...";
+p2 = addPaper "Flexible DIFC in the Presence of Exceptions"
+              "We describe a new, floating-label approach...";
 
 addAssignment "Alice" p1;
 addAssignment "Alice" p2;
@@ -19,6 +21,6 @@ addUser "Bob" "password";
 addAssignment "Bob" p2;
 addConflict "Bob" p1;
 
-asUser "Bob" Bob.mainReview; 
+asUser "Bob" Bob.mainReview;
 
 }

@@ -1,6 +1,6 @@
 {
 
-open import LambdaChair { findPaper };
+open import LambdaChair { findPaper readPaper };
 
 module AliceCode
 interface
@@ -11,15 +11,16 @@ implementation
 {|
 
 fun mainReview {arg:Unit} : Unit = {
-  p1 = findPaper "Flexible Dynamic...";
-  p2 = findPaper "A Static....";
+  p1 = findPaper "All Your IFCException Are Belong To Us";
+  p2 = findPaper "Flexible DIFC in the Presence of Exceptions";
 
-  //readPaper p1;
+  ignore (readPaper p1);
   //appendToReview p1 "Interesting work!";
 
-  //readPaper p2;
+  //ignore (readPaper p2);
   //readReview p2;
   //appendToReview p2 "What about adding new users?";
+  ()
 };
 
 |}
