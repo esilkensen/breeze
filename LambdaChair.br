@@ -1,6 +1,6 @@
 {
 
-open import Str { concat };
+open import Str { concat Printf };
 
 module LambdaChair
 interface
@@ -15,8 +15,8 @@ interface
   // Reviewer interface
   findPaper : String => Int;
   readPaper : Int => String;
-  //readReview : Int => Unit;
-  //appendToReview : Int => String => Unit;
+  readReview : Int => Unit;
+  appendToReview : Int => String => Unit;
 :}
 implementation 
 {|
@@ -35,11 +35,15 @@ User = {:
   assignments : SeqOf Int; // Papers assigned to review
 :};
 
-reviewEntries = ref public [];
-users = ref public [];
+f = newPrin "False";
+bottom' = integrityLabel [[f.prin]];
+lowerPcTo f.pcAuth bottom';
 
-paperPrins = ref public [];
-reviewPrins = ref public [];
+reviewEntries = ref bottom' [];
+users = ref bottom' [];
+
+paperPrins = ref bottom' [];
+reviewPrins = ref bottom' [];
 
 rec fun listRef lst ind = {
   case lst of {
@@ -53,9 +57,9 @@ fun newReviewEnt {id:Int} {title:String} {content:String} : ReviewEnt = {
   r = newPrin (concat "R" (stringOfInt id));
   paperPrins := (!paperPrins) ++ [p];
   reviewPrins := (!reviewPrins) ++ [r];
-  paper = ref (fullLabel [] [[p.prin]]) content;
-  review = ref (fullLabel [[r.prin]] [[r.prin]]) "";
-  {| paperId = id; paperTitle = title; paper = content; review = review; |}
+  paper = ref (bottom' `join` (fullLabel [] [[p.prin]])) content;
+  review = ref (bottom' `join` (fullLabel [[r.prin]] [[r.prin]])) "";
+  {| paperId = id; paperTitle = title; paper = paper; review = review; |}
 };
 
 fun newUser {name:String} {password:String} : User = {
@@ -76,7 +80,7 @@ rec fun findReview {id:Int} {reviews:SeqOf ReviewEnt} : OptOf ReviewEnt = {
     | `Nil => `None
     | `Cons r rs => if r.paperId == id
                     then `Some r
-		    else findReview id rs
+                    else findReview id rs
   }
 };
 
@@ -85,7 +89,7 @@ rec fun findPaperId {title:String} {reviews:SeqOf ReviewEnt} : OptOf Int = {
     | `Nil => `None
     | `Cons r rs => if r.paperTitle == title
                     then `Some r.paperId
-		    else findPaperId title rs
+                    else findPaperId title rs
   }
 };
 
@@ -94,7 +98,7 @@ rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
     | `Nil => `Nil
     | `Cons u us => if u.name == user.name
                     then user :: users
-		    else u :: (replaceUser user us)
+                    else u :: (replaceUser user us)
   }
 };
 
@@ -164,32 +168,39 @@ fun addConflict {name:String} {id:Int} : Unit = {
 // where R1 ... Rn are the principals corresponding corresponding to
 // the review entries for each paper the user is assigned to review.
 fun asUser {name:String} {mainReview:Unit => Unit} : Unit = {
-  rs = map (\id => case listRef (!reviewPrins) (id - 1) of {
-                     | `Some r => r
-                   })
+  putStr (Printf.sprintf "asUser \"%s\"\n" name);
+  rs = map (\id => contents (listRef (!reviewPrins) (id - 1)))
            (sort (\x y => x < y) (getAssignments name));
-  userPc = fullLabel [] (map (\r => [r.prin]) rs);
-  pc = getPc ();
-  lowerPcTo (foldl with emptyAuth (map (\r => r.pcAuth) rs)) userPc;
-  mainReview ();
-  raisePcTo pc;
+  userPc = bottom' `join` (fullLabel [] (map (\r => [r.prin]) rs));
+  ret = {
+    raisePcTo userPc;
+    mainReview ()
+  }@userPc;
+  ()
 };
 
 // Return the id of the given paper. 
 fun findPaper {title:String} : Int = {
-  {
-    raisePcTo public;
-    case (findPaperId title (!reviewEntries)) of {
-      | `None => mkNav "Paper not found"
-      | `Some id => id
-    }
-  }@public
+  putStr (Printf.sprintf "findPaper \"%s\"\n" title);
+  0
 };
 
-// Read and return the content of a paper.
+// Read (and write to an output channel) the content of a paper.
 fun readPaper {id:Int} : String = {
-  // TODO
+  putStr (Printf.sprintf "readPaper %d\n" id);
   ""
+};
+
+// Read (and write to an output channel) the content of a review.
+fun readReview {id:Int} : Unit = {
+  putStr (Printf.sprintf "readReview %d\n" id);
+  ()
+};
+
+// Append a review to the notebook for a paper.
+fun appendToReview {id:Int} {rev:String} : Unit = {
+  putStr (Printf.sprintf "appendToReview %d \"%s\"\n" id rev);
+  ()
 };
 
 |}

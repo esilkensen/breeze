@@ -1,6 +1,6 @@
 {
 
-open import LambdaChair { findPaper };
+open import LambdaChair { findPaper readPaper readReview appendToReview };
 
 module BobCode
 interface
@@ -14,10 +14,9 @@ fun mainReview {arg:Unit} : Unit = {
   p1 = findPaper "All Your IFCException Are Belong To Us";
   p2 = findPaper "Flexible DIFC in the Presence of Exceptions";
 
-  // appendToReview p2 "Hmm, IFC..";
-  // readReview p2;
-  // readReview p1;
-  ()
+  appendToReview p2 "Hmm, IFC..";
+  readReview p2;
+  readReview p1;
 };
 
 |}
