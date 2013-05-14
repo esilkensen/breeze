@@ -170,7 +170,7 @@ fun addConflict name id = {
 };
 
 fun asUser name mainReview = {
-  putStr (Printf.sprintf "asUser \"%s\"\n" name);
+  putStr (Printf.sprintf "\nasUser \"%s\"\n" name);
   currentUser := contents (findUser name);
   rs = map (\id => contents (listRef (!reviewPrins) (id - 1)))
            (sort (\x y => x < y) (!currentUser).assignments);
@@ -210,9 +210,17 @@ fun readReview id = {
     | `None => mkNav "Review not found"
     | `Some r => {
         s = readLIORef r.review;
-	putStr (Printf.sprintf "    review ==> \"%s\"\n" s);
-	// TODO: write to labeled output channel
-	()
+        conflict = (newPrin "#CONFLICT").prin;
+        fun cfilter id = {
+          not (member (\x => x == id) (!currentUser).conflicts)
+        };
+        rs = map (\id => (contents (listRef (!reviewPrins) (id - 1))).prin)
+                 (filter cfilter (map (\r => r.paperId) (!reviewEntries)));
+        cs = map (\id => (contents (listRef (!reviewPrins) (id - 1))).prin)
+                 (!currentUser).conflicts;
+        alab = secrecyLabel (map (\r => [r]) rs);
+        clab = map (\c => secrecyLabel [[c, conflict]]) cs;
+        writeLIORef (newLIORef (foldl join alab clab) "") s;
       }
   }
 };
@@ -222,9 +230,9 @@ fun appendToReview id rev = {
   case findReview id of {
     | `None => mkNav "Review not found"
     | `Some r => {
-	lab = (getPc ()) `join` (labelOfLIORef r.review);
+        lab = (getPc ()) `join` (labelOfLIORef r.review);
         s = { readLIORef r.review }@lab;
-	writeLIORef r.review (Printf.sprintf "%s|%s" s rev);
+        writeLIORef r.review (Printf.sprintf "%s|%s" s rev);
       }
   }
 };
