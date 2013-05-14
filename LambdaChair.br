@@ -220,7 +220,13 @@ fun readReview id = {
                  (!currentUser).conflicts;
         alab = secrecyLabel (map (\r => [r]) rs);
         clab = map (\c => secrecyLabel [[c, conflict]]) cs;
-        writeLIORef (newLIORef (foldl join alab clab) "") s;
+        ret = writeLIORef (newLIORef (foldl join alab clab) "") s;
+        caseNav ret
+          (\_ => {
+            putStr (Printf.sprintf "  ==> \"%s\"\n" s);
+            ret
+          })
+          (\_ => ret)
       }
   }
 };
