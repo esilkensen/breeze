@@ -1,5 +1,8 @@
 {
 
+// A Breeze version of the Lambda Chair example from the LIO library.
+// https://github.com/scslab/lio/tree/master/lio/examples/LambdaChair
+
 open import Str { Printf };
 open import LIORef { newLIORef readLIORef writeLIORef labelOfLIORef };
 
@@ -126,7 +129,8 @@ fun getConflicts name = {
   }
 };
 
-// Create a new review entry for a paper and return its id.
+// System administrator interface //////////////////////////////////////////////
+
 fun addPaper title content = {
   id = 1 + length (!reviewEntries);
   ent = newReviewEnt id title content;
@@ -134,7 +138,6 @@ fun addPaper title content = {
   id
 };
 
-// Create a new user entry for a given name and password.
 fun addUser name password = {
   case (findUser name (!users)) of {
     | `None => users := (newUser name password) :: (!users)
@@ -142,8 +145,6 @@ fun addUser name password = {
   }
 };
 
-// Assign a user to review a paper.  The user must not already be in
-// conflict with the paper.
 fun addAssignment name id = {
   case (findUser name (!users)) of {
     | `None => mkNav "User not found"
@@ -158,8 +159,6 @@ fun addAssignment name id = {
   }
 };
 
-// Mark a user as being in conflict with a paper.  The user must not
-// already be assigned to the paper.
 fun addConflict name id = {
   case (findUser name (!users)) of {
     | `None => mkNav "User not found"
@@ -174,11 +173,9 @@ fun addConflict name id = {
   }
 };
 
-// Execute code with the current pc set to (True, R1 /\ ... /\ Rn)
-// where R1 ... Rn are the principals corresponding corresponding to
-// the review entries for each paper the user is assigned to review.
 fun asUser name mainReview = {
   putStr (Printf.sprintf "asUser \"%s\"\n" name);
+  // set pc = (True, R1 /\ ... /\ Rn)
   rs = map (\id => contents (listRef (!reviewPrins) (id - 1)))
            (sort (\x y => x < y) (getAssignments name));
   userPc = bottom' `join` (fullLabel [] (map (\r => [r.prin]) rs));
@@ -188,7 +185,8 @@ fun asUser name mainReview = {
   lowerPcTo auth bottom';
 };
 
-// Return the id of the given paper. 
+// Reviewer interface //////////////////////////////////////////////////////////
+
 fun findPaper title = {
   putStr (Printf.sprintf "findPaper \"%s\"\n" title);
   case (findPaperId title (!reviewEntries)) of {
@@ -197,7 +195,6 @@ fun findPaper title = {
   }
 };
 
-// Read a paper.
 fun readPaper id = {
   putStr (Printf.sprintf "readPaper %d\n" id);
   case (findReview id (!reviewEntries)) of {
@@ -210,7 +207,6 @@ fun readPaper id = {
   }
 };
 
-// Read a review.
 fun readReview id = {
   putStr (Printf.sprintf "readReview %d\n" id);
   case (findReview id (!reviewEntries)) of {
@@ -224,7 +220,6 @@ fun readReview id = {
   }
 };
 
-// Append a review to the notebook for a paper.
 fun appendToReview id rev = {
   putStr (Printf.sprintf "appendToReview %d \"%s\"\n" id rev);
   case (findReview id (!reviewEntries)) of {
