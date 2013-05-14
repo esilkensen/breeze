@@ -22,6 +22,7 @@ interface
 implementation 
 {|
 
+// pc and clearance start out at "bottom"
 f = newPrin "False";
 bottom' = integrityLabel [[f.prin]];
 lowerPcTo f.pcAuth bottom';
@@ -203,7 +204,7 @@ fun readPaper id = {
     | `None => mkNav "Paper not found"
     | `Some r => {
         lab = (getPc ()) `join` (labelOfLIORef r.paper);
-        s = { readLIORef r.paper }@lab;
+        _ = { readLIORef r.paper }@lab;
         ()
       }
   }

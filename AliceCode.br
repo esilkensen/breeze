@@ -10,7 +10,7 @@ interface
 implementation
 {|
 
-fun mainReview {arg:Unit} : Unit = {
+fun mainReview _ = {
   p1 = findPaper "All Your IFCException Are Belong To Us";
   p2 = findPaper "Flexible DIFC in the Presence of Exceptions";
 
