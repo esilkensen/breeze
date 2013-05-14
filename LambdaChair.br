@@ -33,6 +33,7 @@ lowerClrTo bottom';
 
 reviewEntries = ref bottom' [];
 users = ref bottom' [];
+currentUser = ref bottom' `None;
 
 paperPrins = ref bottom' [];
 reviewPrins = ref bottom' [];
@@ -79,31 +80,40 @@ fun newUser name password = {
   {| name = name; password = password; conflicts = []; assignments = [] |}
 };
 
-rec fun findUser name users = {
-  case users of {
-    | `Nil => `None
-    | `Cons u us => if u.name == name
-                    then `Some u
-                    else findUser name us
-  }
+fun findUser name = {
+  rec fun find name users = {
+    case users of {
+      | `Nil => `None
+      | `Cons u us => if u.name == name
+                      then `Some u
+                      else find name us
+    }
+  };
+  find name (!users)
 };
 
-rec fun findReview id reviews = {
-  case reviews of {
-    | `Nil => `None
-    | `Cons r rs => if r.paperId == id
-                    then `Some r
-                    else findReview id rs
-  }
+fun findReview id = {
+  rec fun find id reviews = {
+    case reviews of {
+      | `Nil => `None
+      | `Cons r rs => if r.paperId == id
+                      then `Some r
+                      else find id rs
+    }
+  };
+  find id (!reviewEntries)
 };
 
-rec fun findPaperId title reviews = {
-  case reviews of {
-    | `Nil => `None
-    | `Cons r rs => if r.paperTitle == title
-                    then `Some r.paperId
-                    else findPaperId title rs
-  }
+fun findPaperId title = {
+  rec fun find title reviews = {
+    case reviews of {
+      | `Nil => `None
+      | `Cons r rs => if r.paperTitle == title
+                      then `Some r.paperId
+                      else find title rs
+    }
+  };
+  find title (!reviewEntries)
 };
 
 rec fun replaceUser user users = {
@@ -112,20 +122,6 @@ rec fun replaceUser user users = {
     | `Cons u us => if u.name == user.name
                     then user :: users
                     else u :: (replaceUser user us)
-  }
-};
-
-fun getAssignments name = {
-  case (findUser name (!users)) of {
-    | `None => mkNav "User not found"
-    | `Some u => u.assignments
-  }
-};
-
-fun getConflicts name = {
-  case (findUser name (!users)) of {
-    | `None => mkNav "User not found"
-    | `Some u => u.conflicts
   }
 };
 
@@ -139,14 +135,14 @@ fun addPaper title content = {
 };
 
 fun addUser name password = {
-  case (findUser name (!users)) of {
+  case findUser name of {
     | `None => users := (newUser name password) :: (!users)
     | `Some u => mkNav "User already exists"
   }
 };
 
 fun addAssignment name id = {
-  case (findUser name (!users)) of {
+  case findUser name of {
     | `None => mkNav "User not found"
     | `Some u => if (member (\x => x == id) u.conflicts)
                  then mkNav "User in conflict with paper"
@@ -160,7 +156,7 @@ fun addAssignment name id = {
 };
 
 fun addConflict name id = {
-  case (findUser name (!users)) of {
+  case findUser name of {
     | `None => mkNav "User not found"
     | `Some u => if (member (\x => x == id) u.assignments)
                  then mkNav "User assigned to paper"
@@ -175,21 +171,22 @@ fun addConflict name id = {
 
 fun asUser name mainReview = {
   putStr (Printf.sprintf "asUser \"%s\"\n" name);
-  // set pc = (True, R1 /\ ... /\ Rn)
+  currentUser := contents (findUser name);
   rs = map (\id => contents (listRef (!reviewPrins) (id - 1)))
-           (sort (\x y => x < y) (getAssignments name));
+           (sort (\x y => x < y) (!currentUser).assignments);
   userPc = bottom' `join` (fullLabel [] (map (\r => [r.prin]) rs));
-  raisePcTo userPc;
+  raisePcTo userPc; // (True, R1 /\ ... /\ Rn)
   mainReview ();
   auth = foldl with f.pcAuth (map (\r => r.pcAuth) (!reviewPrins));
   lowerPcTo auth bottom';
+  currentUser := `None
 };
 
 // Reviewer interface //////////////////////////////////////////////////////////
 
 fun findPaper title = {
   putStr (Printf.sprintf "findPaper \"%s\"\n" title);
-  case (findPaperId title (!reviewEntries)) of {
+  case findPaperId title of {
     | `None => mkNav "Paper not found"
     | `Some id => id
   }
@@ -197,7 +194,7 @@ fun findPaper title = {
 
 fun readPaper id = {
   putStr (Printf.sprintf "readPaper %d\n" id);
-  case (findReview id (!reviewEntries)) of {
+  case findReview id of {
     | `None => mkNav "Paper not found"
     | `Some r => {
         lab = (getPc ()) `join` (labelOfLIORef r.paper);
@@ -209,7 +206,7 @@ fun readPaper id = {
 
 fun readReview id = {
   putStr (Printf.sprintf "readReview %d\n" id);
-  case (findReview id (!reviewEntries)) of {
+  case findReview id of {
     | `None => mkNav "Review not found"
     | `Some r => {
         s = readLIORef r.review;
@@ -222,7 +219,7 @@ fun readReview id = {
 
 fun appendToReview id rev = {
   putStr (Printf.sprintf "appendToReview %d \"%s\"\n" id rev);
-  case (findReview id (!reviewEntries)) of {
+  case findReview id of {
     | `None => mkNav "Review not found"
     | `Some r => {
 	lab = (getPc ()) `join` (labelOfLIORef r.review);
