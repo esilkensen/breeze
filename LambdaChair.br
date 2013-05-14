@@ -59,10 +59,13 @@ fun newReviewEnt id title content = {
   r = newPrin (Printf.sprintf "R%d" id);
   paperPrins := (!paperPrins) ++ [p];
   reviewPrins := (!reviewPrins) ++ [r];
+
+  // raise clearance to the new "top"
   prins = (!paperPrins) ++ (!reviewPrins);
   auth = foldl with f.clrAuth (map (\l => l.clrAuth) prins);
   clr = (paperLabel id) `join` (reviewLabel id);
   raiseClrTo auth ((getClr ()) `join` clr);
+
   paper = newLIORef (paperLabel id) content;
   review = newLIORef (reviewLabel id) "";
   {| paperId = id; paperTitle = title; paper = paper; review = review; |};
