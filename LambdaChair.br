@@ -25,6 +25,10 @@ interface
 implementation 
 {|
 
+debug = true;
+
+fun log str = { if debug then putStr str else () };
+
 // pc and clearance start out at "bottom"
 f = newPrin "False";
 bottom' = integrityLabel [[f.prin]];
@@ -170,7 +174,7 @@ fun addConflict name id = {
 };
 
 fun asUser name mainReview = {
-  putStr (Printf.sprintf "\nasUser \"%s\"\n" name);
+  log (Printf.sprintf "\nasUser \"%s\"\n" name);
   currentUser := contents (findUser name);
   rs = map (\id => contents (listRef (!reviewPrins) (id - 1)))
            (sort (\x y => x < y) (!currentUser).assignments);
@@ -185,7 +189,7 @@ fun asUser name mainReview = {
 // Reviewer interface //////////////////////////////////////////////////////////
 
 fun findPaper title = {
-  putStr (Printf.sprintf "findPaper \"%s\"\n" title);
+  log (Printf.sprintf "findPaper \"%s\"\n" title);
   case findPaperId title of {
     | `None => mkNav "Paper not found"
     | `Some id => id
@@ -193,7 +197,7 @@ fun findPaper title = {
 };
 
 fun readPaper id = {
-  putStr (Printf.sprintf "readPaper %d\n" id);
+  log (Printf.sprintf "readPaper %d\n" id);
   case findReview id of {
     | `None => mkNav "Paper not found"
     | `Some r => {
@@ -205,7 +209,7 @@ fun readPaper id = {
 };
 
 fun readReview id = {
-  putStr (Printf.sprintf "readReview %d\n" id);
+  log (Printf.sprintf "readReview %d\n" id);
   case findReview id of {
     | `None => mkNav "Review not found"
     | `Some r => {
@@ -223,7 +227,7 @@ fun readReview id = {
         ret = writeLIORef (newLIORef (foldl join alab clab) "") s;
         caseNav ret
           (\_ => {
-            putStr (Printf.sprintf "  ==> \"%s\"\n" s);
+            log (Printf.sprintf "  ==> \"%s\"\n" s);
             ret
           })
           (\_ => ret)
@@ -232,7 +236,7 @@ fun readReview id = {
 };
 
 fun appendToReview id rev = {
-  putStr (Printf.sprintf "appendToReview %d \"%s\"\n" id rev);
+  log (Printf.sprintf "appendToReview %d \"%s\"\n" id rev);
   case findReview id of {
     | `None => mkNav "Review not found"
     | `Some r => {
