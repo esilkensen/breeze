@@ -16,7 +16,7 @@ fun mainReview _ = {
 
   appendToReview p2 "Hmm, IFC..";
   readReview p2;
-  readReview p1;
+  readReview p1; // IFC violation: conflict with p1
 };
 
 |}
