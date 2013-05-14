@@ -1,6 +1,7 @@
 {
 
-open import Str { concat Printf };
+open import Str { Printf };
+open import LIORef { newLIORef readLIORef writeLIORef labelOfLIORef };
 
 module LambdaChair
 interface
@@ -14,30 +15,17 @@ interface
 
   // Reviewer interface
   findPaper : String => Int;
-  readPaper : Int => String;
+  readPaper : Int => Unit;
   readReview : Int => Unit;
   appendToReview : Int => String => Unit;
 :}
 implementation 
 {|
 
-ReviewEnt = {:
-  paperId    : Int;          // Paper number
-  paperTitle : String;       // Paper title
-  paper      : RefOf String; // Paper content
-  review     : RefOf String; // Notebook
-:};
-
-User = {:
-  name        : String;    // User name
-  password    : String;    // Password
-  conflicts   : SeqOf Int; // Conflicting papers
-  assignments : SeqOf Int; // Papers assigned to review
-:};
-
 f = newPrin "False";
 bottom' = integrityLabel [[f.prin]];
 lowerPcTo f.pcAuth bottom';
+lowerClrTo bottom';
 
 reviewEntries = ref bottom' [];
 users = ref bottom' [];
@@ -52,21 +40,39 @@ rec fun listRef lst ind = {
   }
 };
 
-fun newReviewEnt {id:Int} {title:String} {content:String} : ReviewEnt = {
-  p = newPrin (concat "P" (stringOfInt id));
-  r = newPrin (concat "R" (stringOfInt id));
-  paperPrins := (!paperPrins) ++ [p];
-  reviewPrins := (!reviewPrins) ++ [r];
-  paper = ref (bottom' `join` (fullLabel [] [[p.prin]])) content;
-  review = ref (bottom' `join` (fullLabel [[r.prin]] [[r.prin]])) "";
-  {| paperId = id; paperTitle = title; paper = paper; review = review; |}
+fun paperLabel id = {
+  case (listRef (!paperPrins) (id - 1)) of {
+    | `None => mkNav "Paper not found"
+    | `Some p => bottom' `join` (fullLabel [] [[p.prin]])
+  }
 };
 
-fun newUser {name:String} {password:String} : User = {
+fun reviewLabel id = {
+  case (listRef (!reviewPrins) (id - 1)) of {
+    | `None => mkNav "Paper not found"
+    | `Some r => bottom' `join` (fullLabel [[r.prin]] [[r.prin]])
+  }
+};
+
+fun newReviewEnt id title content = {
+  p = newPrin (Printf.sprintf "P%d" id);
+  r = newPrin (Printf.sprintf "R%d" id);
+  paperPrins := (!paperPrins) ++ [p];
+  reviewPrins := (!reviewPrins) ++ [r];
+  prins = (!paperPrins) ++ (!reviewPrins);
+  auth = foldl with f.clrAuth (map (\l => l.clrAuth) prins);
+  clr = (paperLabel id) `join` (reviewLabel id);
+  raiseClrTo auth ((getClr ()) `join` clr);
+  paper = newLIORef (paperLabel id) content;
+  review = newLIORef (reviewLabel id) "";
+  {| paperId = id; paperTitle = title; paper = paper; review = review; |};
+};
+
+fun newUser name password = {
   {| name = name; password = password; conflicts = []; assignments = [] |}
 };
 
-rec fun findUser {name:String} {users:SeqOf User} : OptOf User = {
+rec fun findUser name users = {
   case users of {
     | `Nil => `None
     | `Cons u us => if u.name == name
@@ -75,7 +81,7 @@ rec fun findUser {name:String} {users:SeqOf User} : OptOf User = {
   }
 };
 
-rec fun findReview {id:Int} {reviews:SeqOf ReviewEnt} : OptOf ReviewEnt = {
+rec fun findReview id reviews = {
   case reviews of {
     | `Nil => `None
     | `Cons r rs => if r.paperId == id
@@ -84,7 +90,7 @@ rec fun findReview {id:Int} {reviews:SeqOf ReviewEnt} : OptOf ReviewEnt = {
   }
 };
 
-rec fun findPaperId {title:String} {reviews:SeqOf ReviewEnt} : OptOf Int = {
+rec fun findPaperId title reviews = {
   case reviews of {
     | `Nil => `None
     | `Cons r rs => if r.paperTitle == title
@@ -93,7 +99,7 @@ rec fun findPaperId {title:String} {reviews:SeqOf ReviewEnt} : OptOf Int = {
   }
 };
 
-rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
+rec fun replaceUser user users = {
   case users of {
     | `Nil => `Nil
     | `Cons u us => if u.name == user.name
@@ -102,14 +108,14 @@ rec fun replaceUser {user:User} {users:SeqOf User} : SeqOf User = {
   }
 };
 
-fun getAssignments {name:String} : SeqOf Int = {
+fun getAssignments name = {
   case (findUser name (!users)) of {
     | `None => mkNav "User not found"
     | `Some u => u.assignments
   }
 };
 
-fun getConflicts {name:String} : SeqOf Int = {
+fun getConflicts name = {
   case (findUser name (!users)) of {
     | `None => mkNav "User not found"
     | `Some u => u.conflicts
@@ -117,7 +123,7 @@ fun getConflicts {name:String} : SeqOf Int = {
 };
 
 // Create a new review entry for a paper and return its id.
-fun addPaper {title:String} {content:String} : Int = {
+fun addPaper title content = {
   id = 1 + length (!reviewEntries);
   ent = newReviewEnt id title content;
   reviewEntries := ent :: (!reviewEntries);
@@ -125,7 +131,7 @@ fun addPaper {title:String} {content:String} : Int = {
 };
 
 // Create a new user entry for a given name and password.
-fun addUser {name:String} {password:String} : Unit = {
+fun addUser name password = {
   case (findUser name (!users)) of {
     | `None => users := (newUser name password) :: (!users)
     | `Some u => mkNav "User already exists"
@@ -134,7 +140,7 @@ fun addUser {name:String} {password:String} : Unit = {
 
 // Assign a user to review a paper.  The user must not already be in
 // conflict with the paper.
-fun addAssignment {name:String} {id:Int} : Unit = {
+fun addAssignment name id = {
   case (findUser name (!users)) of {
     | `None => mkNav "User not found"
     | `Some u => if (member (\x => x == id) u.conflicts)
@@ -150,7 +156,7 @@ fun addAssignment {name:String} {id:Int} : Unit = {
 
 // Mark a user as being in conflict with a paper.  The user must not
 // already be assigned to the paper.
-fun addConflict {name:String} {id:Int} : Unit = {
+fun addConflict name id = {
   case (findUser name (!users)) of {
     | `None => mkNav "User not found"
     | `Some u => if (member (\x => x == id) u.assignments)
@@ -167,40 +173,64 @@ fun addConflict {name:String} {id:Int} : Unit = {
 // Execute code with the current pc set to (True, R1 /\ ... /\ Rn)
 // where R1 ... Rn are the principals corresponding corresponding to
 // the review entries for each paper the user is assigned to review.
-fun asUser {name:String} {mainReview:Unit => Unit} : Unit = {
+fun asUser name mainReview = {
   putStr (Printf.sprintf "asUser \"%s\"\n" name);
   rs = map (\id => contents (listRef (!reviewPrins) (id - 1)))
            (sort (\x y => x < y) (getAssignments name));
   userPc = bottom' `join` (fullLabel [] (map (\r => [r.prin]) rs));
-  ret = {
-    raisePcTo userPc;
-    mainReview ()
-  }@userPc;
-  ()
+  raisePcTo userPc;
+  mainReview ();
+  auth = foldl with f.pcAuth (map (\r => r.pcAuth) (!reviewPrins));
+  lowerPcTo auth bottom';
 };
 
 // Return the id of the given paper. 
-fun findPaper {title:String} : Int = {
+fun findPaper title = {
   putStr (Printf.sprintf "findPaper \"%s\"\n" title);
-  0
+  case (findPaperId title (!reviewEntries)) of {
+    | `None => mkNav "Paper not found"
+    | `Some id => id
+  }
 };
 
-// Read (and write to an output channel) the content of a paper.
-fun readPaper {id:Int} : String = {
+// Read a paper.
+fun readPaper id = {
   putStr (Printf.sprintf "readPaper %d\n" id);
-  ""
+  case (findReview id (!reviewEntries)) of {
+    | `None => mkNav "Paper not found"
+    | `Some r => {
+        lab = (getPc ()) `join` (labelOfLIORef r.paper);
+        s = { readLIORef r.paper }@lab;
+        ()
+      }
+  }
 };
 
-// Read (and write to an output channel) the content of a review.
-fun readReview {id:Int} : Unit = {
+// Read a review.
+fun readReview id = {
   putStr (Printf.sprintf "readReview %d\n" id);
-  ()
+  case (findReview id (!reviewEntries)) of {
+    | `None => mkNav "Review not found"
+    | `Some r => {
+        s = readLIORef r.review;
+	putStr (Printf.sprintf "    review ==> \"%s\"\n" s);
+	// TODO: write to labeled output channel
+	()
+      }
+  }
 };
 
 // Append a review to the notebook for a paper.
-fun appendToReview {id:Int} {rev:String} : Unit = {
+fun appendToReview id rev = {
   putStr (Printf.sprintf "appendToReview %d \"%s\"\n" id rev);
-  ()
+  case (findReview id (!reviewEntries)) of {
+    | `None => mkNav "Review not found"
+    | `Some r => {
+	lab = (getPc ()) `join` (labelOfLIORef r.review);
+        s = { readLIORef r.review }@lab;
+	writeLIORef r.review (Printf.sprintf "%s|%s" s rev);
+      }
+  }
 };
 
 |}

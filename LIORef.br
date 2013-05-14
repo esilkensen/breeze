@@ -1,0 +1,35 @@
+{
+
+{|
+
+fun newLIORef l e = {
+  c = channel l;
+  send c e;
+  c
+};
+
+fun readLIORef a = {
+  r = raisePcTo ((getPc ()) `join` (labelOfChan a));
+  caseNav r
+    (\_ => peek a)
+    (\_ => r)
+};
+
+fun writeLIORef a e' = {
+  e = recv a;
+  r = send a e';
+  caseNav r
+    (\_ => ())
+    (\_ => {
+      _ = send a e;
+      r
+    })
+};
+
+fun labelOfLIORef a = {
+  labelOfChan a
+};
+
+|}
+
+}
