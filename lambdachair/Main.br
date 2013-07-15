@@ -1,0 +1,62 @@
+{
+
+ByteArrays = import ByteArrays;
+HttpServer = import HttpServer;
+HttpSession = import HttpSession;
+HTML = import HTML;
+
+port = 8080;
+
+fun routingFunction path request cookieTray serverState appState session = {
+  fun loginPage () = {
+    HttpServer.Ok
+      (ByteArrays.bytesEncodeUTF8
+        (Str.stringJoin
+          (HTML.serialize
+            (`Root
+              (`Head [(`Title "Lambda Chair")])
+              (`Body
+                [(`H1 "Lambda Chair"),
+                 (`Form
+                   {| action="login"; method="post" |}
+                   [(`Label {| for="user" |} "Username:"),
+                    (`Input {| type="text"; name="user" |}),
+                    (`Input {| type="submit"; val="Login" |})])])))
+          "\n"))
+  };
+
+  fun homePage idinfo = {
+    /* TODO */
+    loginPage ()
+  };
+
+  fun login () = {
+    /* TODO */
+    loginPage ()
+  };
+
+  fun logout () = {
+    /* TODO */
+    loginPage ()
+  };
+
+  case session.get () of {
+    | `None => case request.parsed.path of {
+        | "/" => loginPage ()
+        | "/logout" => loginPage ()
+        | "/login" => login ()
+        | _ => HttpServer.NotFound
+      }
+    | `Some idinfo => case request.parsed.path of {
+        | "/" => homePage idinfo
+        | "/logout" => logout ()
+        | _ => HttpServer.NotFound
+      }
+  }
+};
+
+clientState = ();
+
+HttpSession.runServer port routingFunction clientState;
+
+}
