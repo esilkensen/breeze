@@ -7,7 +7,7 @@ HTML = import HTML;
 
 port = 8080;
 
-fun routingFunction path request cookieTray serverState appState session = {
+fun route path request cookie server app session = {
   fun loginPage () = {
     HttpServer.Ok
       (ByteArrays.bytesEncodeUTF8
@@ -55,8 +55,8 @@ fun routingFunction path request cookieTray serverState appState session = {
   }
 };
 
-clientState = ();
+client = ();
 
-HttpSession.runServer port routingFunction clientState;
+HttpSession.runServer port route client;
 
 }
