@@ -27,12 +27,29 @@ fun route path request cookie server app session = {
 
   fun homePage idinfo = {
     /* TODO */
-    loginPage ()
+    HttpServer.Ok
+      (ByteArrays.bytesEncodeUTF8
+        (Str.stringJoin
+          (HTML.serialize
+            (`Root
+              (`Head [(`Title "Lambda Chair")])
+              (`Body
+                [(`H1 "Lambda Chair"),
+		 (`H2 ["Welcome, ", idinfo, "!"])])))
+          "\n"))
   };
 
   fun login () = {
     /* TODO */
-    loginPage ()
+    case request.parameters.lookup "user" of {
+      | `Some user => {
+          session.set (`Some user);
+	  homePage user
+        }
+      | `None => {
+          loginPage ()
+        }
+    }
   };
 
   fun logout () = {
