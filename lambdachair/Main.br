@@ -8,7 +8,7 @@ open import HttpSession { runServer };
 
 HTML = import HTML;
 
-DB = import DB;
+DB = import LambdaChair;
 
 port = 8080;
 
