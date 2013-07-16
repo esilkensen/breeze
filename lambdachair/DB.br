@@ -1,0 +1,76 @@
+{
+
+module DB
+interface
+{:
+  Paper = {:
+    id : Int;
+    title : String;
+    authors : SeqOf String;
+    content : String;
+    conflicts : SeqOf String;
+  :};
+
+  Review = {:
+    id : Int;
+    paper : Int;
+    author : String;
+    content : String;
+  :};
+
+  addPaper : String => SeqOf String => String => SeqOf String => Unit;
+  getPapers : String => SeqOf Paper;
+  getPaper : Int => OptOf Paper;
+
+  addReview : Int => String => String => Unit;
+  getReviews : Int => SeqOf Review;
+:}
+implementation
+{|
+
+papers = ref public [];
+reviews = ref public [];
+
+nextPid = ref public 0;
+nextRid = ref public 0;
+
+fun addPaper title authors content conflicts = {
+  p = {| id={ nextPid := 1 + (!nextPid); (!nextPid) }; title=title;
+         authors=authors; content=content; conflicts=conflicts |};
+  papers := (!papers) ++ [p];
+};
+
+fun getPapers user = {
+  (!papers)
+};
+
+fun getPaper id = {
+  rec fun lookup papers = {
+    case papers of {
+      | `Nil => `None
+      | `Cons p ps => if p.id == id then `Some p else lookup ps
+    }
+  };
+  lookup (!papers)
+};
+
+fun addReview paper author content = {
+  r = {| id={ nextRid := 1 + (!nextRid); (!nextRid) }; paper=paper;
+          author=author; content=content |};
+  reviews := (!reviews) ++ [r];
+};
+
+fun getReviews paper = {
+  rec fun lookup reviews ret = {
+    case reviews of {
+      | `Nil => ret
+      | `Some r rs =>
+          lookup rs (if r.paper == paper then r :: ret else ret)
+    }
+  };
+  lookup (!reviews) []
+};
+
+|}
+
+}

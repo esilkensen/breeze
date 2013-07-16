@@ -1,79 +1,118 @@
 {
 
-ByteArrays = import ByteArrays;
-HttpServer = import HttpServer;
-HttpSession = import HttpSession;
+open import Str { Printf intOfString replace stringJoin strip };
+open import Option { bind contentsOr omap };
+open import HttpServer { Ok NotFound };
+open import ByteArrays { bytesEncodeUTF8 };
+open import HttpSession { runServer };
+
 HTML = import HTML;
+
+DB = import DB;
 
 port = 8080;
 
-fun route path request cookie server app session = {
+fun route path request cookie server DB session = {
+  fun respond html =
+    Ok (bytesEncodeUTF8 (stringJoin (HTML.serialize html) "\n"));
+
   fun loginPage () = {
-    HttpServer.Ok
-      (ByteArrays.bytesEncodeUTF8
-        (Str.stringJoin
-          (HTML.serialize
-            (`Root
-              (`Head [(`Title "Lambda Chair")])
-              (`Body
-                [(`H1 "Lambda Chair"),
-                 (`Form
-                   {| action="login"; method="post" |}
-                   [(`Label {| for="user" |} "Username:"),
-                    (`Input {| type="text"; name="user" |}),
-                    (`Input {| type="submit"; val="Login" |})])])))
-          "\n"))
+    sid = stringOfInt (session.id ());
+    respond
+      (`Root
+        (`Head [(`Title "Lambda Chair")])
+        (`Body
+          [(`H1 "Lambda Chair"),
+           (`Form
+             {| action="home"; method="post" |}
+             [(`Label {| for="user" |} "Username:"),
+              (`Input {| type="text"; name="user" |}),
+              (`Input {| type="hidden"; name="sessionID"; val=sid |}),
+              (`Input {| type="submit"; val="Login" |})])]));
   };
 
-  fun homePage idinfo = {
-    /* TODO */
-    HttpServer.Ok
-      (ByteArrays.bytesEncodeUTF8
-        (Str.stringJoin
-          (HTML.serialize
-            (`Root
-              (`Head [(`Title "Lambda Chair")])
-              (`Body
-                [(`H1 "Lambda Chair"),
-		 (`H2 ["Welcome, ", idinfo, "!"])])))
-          "\n"))
+  fun homePage user = {
+    fun url p =
+      Printf.sprintf
+        "/paper?id=%d&sessionID=%d" p.id (session.id ());
+    respond
+      (`Root
+        (`Head [(`Title "Lambda Chair - Home")])
+        (`Body
+          [(`H1 "Lambda Chair"),
+           (`P ["Logged in as: ", user]),
+           (`P "Papers:"),
+           (`Ul (map (\p => `Li (`A {| href=url p |} p.title))
+                     (DB.getPapers user)))]))
+  };
+
+  fun paperPage user = {
+    fun page paper = {
+      pageTitle = Printf.sprintf "Lambda Chair - Paper %d" paper.id;
+      respond
+        (`Root
+          (`Head [(`Title pageTitle)])
+          (`Body
+            [(`H1 pageTitle),
+             (`P ["Logged in as: ", user]),
+             (`P paper.title),
+             (`P (stringJoin paper.authors ", "))]))
+    };
+    id = bind intOfString (request.parsed.params.lookup "id");
+    contentsOr (omap page (bind DB.getPaper id)) NotFound
   };
 
   fun login () = {
-    /* TODO */
     case request.parameters.lookup "user" of {
-      | `Some user => {
-          session.set (`Some user);
-	  homePage user
+      | `Some str => {
+          case strip (replace str "+" " ") of {
+            | "" => loginPage ()
+            | user => {
+                session.set (`Some user);
+                homePage user
+              }
+          }
         }
-      | `None => {
-          loginPage ()
-        }
+      | `None => loginPage ()
     }
   };
 
   fun logout () = {
-    /* TODO */
+    session.end ();
     loginPage ()
   };
 
   case session.get () of {
-    | `None => case request.parsed.path of {
+    | `None => case path of {
         | "/" => loginPage ()
         | "/logout" => loginPage ()
-        | "/login" => login ()
-        | _ => HttpServer.NotFound
+        | "/home" => login ()
+        | _ => NotFound
       }
-    | `Some idinfo => case request.parsed.path of {
-        | "/" => homePage idinfo
+    | `Some user => case path of {
+        | "/" => homePage user
+        | "/paper" => paperPage user
         | "/logout" => logout ()
-        | _ => HttpServer.NotFound
+        | _ => NotFound
       }
   }
 };
 
-client = ();
+DB.addPaper
+  "Declarative, Temporal, and Practical Programming with Capabilities"
+  ["William R. Harris", "Somesh Jha", "Thomas Reps",
+   "Jonathan Anderson", "Robert N. M. Watson"]
+  "Developing practical but secure programs remains a difficult,
+  important, and open problem."
+  ["bob"];
 
-HttpSession.runServer port route client;
+DB.addPaper
+  "Aura: A Programming Language for Authorization and Audit"
+  ["Limin Jia", "Jeffrey A. Vaughan", "Karl Mazurak", "Jianzhou Zhao",
+  "Luke Zarko", "Joseph Schorr", "Steve Zdancewic"]
+  "There can be no universal definition of security."
+  [];
+  
+runServer port route DB;
 
 }
