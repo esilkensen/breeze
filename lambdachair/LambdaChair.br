@@ -94,19 +94,12 @@ fun getPapers _ =  (!papers);
 
 fun getReviews paper = {
   fun canView review = {
-    user = contents (!currentUser);
+    user = (contents (!currentUser)).username;
     conflicts = (contents (getPaper review.paper)).conflicts;
-    (review.author == user.username) ||
-      (not (member (\c => user.username == c) conflicts))
+    (review.author == user) ||
+      (not (member (\c => user == c) conflicts))
   };
-  rec fun lookup reviews ret = {
-    case reviews of {
-      | `Nil => ret
-      | `Cons r rs =>
-          lookup rs (if r.paper == paper then ret ++ [r] else ret)
-    }
-  };
-  filter canView (lookup (!reviews) [])
+  filter (\r => (r.paper == paper) && canView r) (!reviews)
 };
 
 fun loginUser username = {

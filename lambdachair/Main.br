@@ -34,12 +34,14 @@ fun route path request cookie server LC session = {
     fun url p =
       Printf.sprintf
         "/paper?id=%d&sessionID=%d" p.id (session.id ());
+    outUrl = Printf.sprintf "/logout?sessionID=%d" (session.id ());
+    outLink = (`A {| href=outUrl |} "Logout");
     respond
       (`Root
         (`Head [(`Title "Lambda Chair - Home")])
         (`Body
           [(`H1 "Lambda Chair"),
-           (`P ["Logged in as: ", user]),
+           (`P ["Logged in as: ", user, " | ", outLink]),
            (`H3 "Papers"),
            (`Ul (map (\p => `Li (`A {| href=url p |} p.title))
                      (LC.getPapers ())))]))
@@ -60,13 +62,15 @@ fun route path request cookie server LC session = {
         }
       };
       pageTitle = Printf.sprintf "Lambda Chair - Paper %d" paper.id;
+      outUrl = Printf.sprintf "/logout?sessionID=%d" (session.id ());
+      outLink = (`A {| href=outUrl |} "Logout");
       reviews = renderReviews (LC.getReviews paper.id) 1 [];
       respond
         (`Root
           (`Head [(`Title pageTitle)])
           (`Body
             ([(`H1 "Lambda Chair"),
-              (`P ["Logged in as: ", user]),
+              (`P ["Logged in as: ", user, " | ", outLink]),
               (`H3 ["Paper ", stringOfInt paper.id]),
               (`P ["Title: ", paper.title]),
               (`P ["Author: ", (stringJoin paper.authors ", ")]),
@@ -83,11 +87,9 @@ fun route path request cookie server LC session = {
             | "" => loginPage ()
             | user => {
 	        if LC.loginUser user then {
-		  putStr "login success!\n";
                   session.set (`Some user);
                   homePage user
 		} else {
-		  putStr "login failed!\n";
 		  loginPage ()
 		}
               }
@@ -98,7 +100,6 @@ fun route path request cookie server LC session = {
   };
 
   fun logout () = {
-    putStr "logout ()\n";
     LC.logoutUser ();
     session.end ();
     loginPage ()
