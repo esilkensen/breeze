@@ -3,6 +3,12 @@
 module LambdaChair
 interface
 {:
+  User = {:
+    id : Int;
+    username : String;
+    prin : Prin;
+  :};
+
   Paper = {:
     id : Int;
     title : String;
@@ -18,21 +24,36 @@ interface
     content : String;
   :};
 
+  addUser : String => Unit;
   addPaper : String => SeqOf String => String => SeqOf String => Unit;
-  getPapers : String => SeqOf Paper;
-  getPaper : Int => OptOf Paper;
-
   addReview : Int => String => String => Unit;
+
+  getPaper : Int => OptOf Paper;
+  getPapers : Unit => SeqOf Paper;
   getReviews : Int => SeqOf Review;
+
+  loginUser : String => Bool;
+  logoutUser : Unit => Unit;
 :}
 implementation
 {|
 
+users = ref public [];
 papers = ref public [];
 reviews = ref public [];
 
+nextUid = ref public 0;
 nextPid = ref public 0;
 nextRid = ref public 0;
+
+currentUser = ref public `None;
+
+fun addUser username = {
+  p = newPrin username;
+  u = {| id={ nextUid := 1 + (!nextUid); (!nextUid) };
+         username=username; prin=p.prin |};
+  users := (!users) ++ [u];
+};
 
 fun addPaper title authors content conflicts = {
   p = {| id={ nextPid := 1 + (!nextPid); (!nextPid) }; title=title;
@@ -40,9 +61,24 @@ fun addPaper title authors content conflicts = {
   papers := (!papers) ++ [p];
 };
 
-fun getPapers user = {
-  (!papers)
+fun addReview paper author content = {
+  r = {| id={ nextRid := 1 + (!nextRid); (!nextRid) }; paper=paper;
+         author=author; content=content |};
+  reviews := (!reviews) ++ [r];
 };
+
+fun getUser username = {
+  rec fun lookup users = {
+    case users of {
+      | `Nil => `None
+      | `Cons u us =>
+          if u.username == username then `Some u else lookup us
+    }
+  };
+  lookup (!users)
+};
+
+fun getUsers _ = (!users);
 
 fun getPaper id = {
   rec fun lookup papers = {
@@ -54,21 +90,41 @@ fun getPaper id = {
   lookup (!papers)
 };
 
-fun addReview paper author content = {
-  r = {| id={ nextRid := 1 + (!nextRid); (!nextRid) }; paper=paper;
-          author=author; content=content |};
-  reviews := (!reviews) ++ [r];
-};
+fun getPapers _ =  (!papers);
 
 fun getReviews paper = {
+  fun canView review = {
+    user = contents (!currentUser);
+    conflicts = (contents (getPaper review.paper)).conflicts;
+    (review.author == user.username) ||
+      (not (member (\c => user.username == c) conflicts))
+  };
   rec fun lookup reviews ret = {
     case reviews of {
       | `Nil => ret
-      | `Some r rs =>
-          lookup rs (if r.paper == paper then r :: ret else ret)
+      | `Cons r rs =>
+          lookup rs (if r.paper == paper then ret ++ [r] else ret)
     }
   };
-  lookup (!reviews) []
+  filter canView (lookup (!reviews) [])
+};
+
+fun loginUser username = {
+  case (!currentUser) of {
+    | `Some u => false
+    | `None => {
+      case getUser username of {
+        | `Some u => {
+            currentUser := `Some u; true
+	  }
+	| `None => false
+      }
+    }
+  }
+};
+
+fun logoutUser _ = {
+  currentUser := `None
 };
 
 |}

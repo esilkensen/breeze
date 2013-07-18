@@ -5,16 +5,15 @@ open import Option { bind contentsOr omap };
 open import HttpServer { Ok NotFound };
 open import ByteArrays { bytesEncodeUTF8 };
 open import HttpSession { runServer };
+open import HTML { serialize };
 
-HTML = import HTML;
-
-DB = import LambdaChair;
+LC = import LambdaChair;
 
 port = 8080;
 
-fun route path request cookie server DB session = {
+fun route path request cookie server LC session = {
   fun respond html =
-    Ok (bytesEncodeUTF8 (stringJoin (HTML.serialize html) "\n"));
+    Ok (bytesEncodeUTF8 (stringJoin (serialize html) "\n"));
 
   fun loginPage () = {
     sid = stringOfInt (session.id ());
@@ -24,7 +23,7 @@ fun route path request cookie server DB session = {
         (`Body
           [(`H1 "Lambda Chair"),
            (`Form
-             {| action="home"; method="post" |}
+             {| action="login"; method="post" |}
              [(`Label {| for="user" |} "Username:"),
               (`Input {| type="text"; name="user" |}),
               (`Input {| type="hidden"; name="sessionID"; val=sid |}),
@@ -41,25 +40,40 @@ fun route path request cookie server DB session = {
         (`Body
           [(`H1 "Lambda Chair"),
            (`P ["Logged in as: ", user]),
-           (`P "Papers:"),
+           (`H3 "Papers"),
            (`Ul (map (\p => `Li (`A {| href=url p |} p.title))
-                     (DB.getPapers user)))]))
+                     (LC.getPapers ())))]))
   };
 
   fun paperPage user = {
     fun page paper = {
+      rec fun renderReviews reviews n ret = {
+        case reviews of {
+          | `Nil => ret
+          | `Cons r rs => {
+              html = (`Div
+                       [(`H4 ["Review ", stringOfInt n]),
+                        (`P ["Author: ", r.author]),
+                        (`Div r.content)]);
+              renderReviews rs (n + 1) (ret ++ [html])
+            }
+        }
+      };
       pageTitle = Printf.sprintf "Lambda Chair - Paper %d" paper.id;
+      reviews = renderReviews (LC.getReviews paper.id) 1 [];
       respond
         (`Root
           (`Head [(`Title pageTitle)])
           (`Body
-            [(`H1 pageTitle),
-             (`P ["Logged in as: ", user]),
-             (`P paper.title),
-             (`P (stringJoin paper.authors ", "))]))
+            ([(`H1 "Lambda Chair"),
+              (`P ["Logged in as: ", user]),
+              (`H3 ["Paper ", stringOfInt paper.id]),
+              (`P ["Title: ", paper.title]),
+              (`P ["Author: ", (stringJoin paper.authors ", ")]),
+              (`Div paper.content)] ++ reviews)))
     };
     id = bind intOfString (request.parsed.params.lookup "id");
-    contentsOr (omap page (bind DB.getPaper id)) NotFound
+    contentsOr (omap page (bind LC.getPaper id)) NotFound
   };
 
   fun login () = {
@@ -68,8 +82,14 @@ fun route path request cookie server DB session = {
           case strip (replace str "+" " ") of {
             | "" => loginPage ()
             | user => {
-                session.set (`Some user);
-                homePage user
+	        if LC.loginUser user then {
+		  putStr "login success!\n";
+                  session.set (`Some user);
+                  homePage user
+		} else {
+		  putStr "login failed!\n";
+		  loginPage ()
+		}
               }
           }
         }
@@ -78,41 +98,77 @@ fun route path request cookie server DB session = {
   };
 
   fun logout () = {
+    putStr "logout ()\n";
+    LC.logoutUser ();
     session.end ();
     loginPage ()
   };
 
   case session.get () of {
-    | `None => case path of {
-        | "/" => loginPage ()
-        | "/logout" => loginPage ()
-        | "/home" => login ()
-        | _ => NotFound
-      }
     | `Some user => case path of {
         | "/" => homePage user
         | "/paper" => paperPage user
         | "/logout" => logout ()
         | _ => NotFound
       }
+    | `None => case path of {
+        | "/" => logout ()
+	| "/login" => login ()
+        | "/logout" => logout ()
+        | "/paper" => logout ()
+        | "/home" => logout ()
+        | _ => NotFound
+      }
   }
 };
 
-DB.addPaper
+LC.addUser "alice";
+LC.addUser "bob";
+
+LC.addPaper
   "Declarative, Temporal, and Practical Programming with Capabilities"
   ["William R. Harris", "Somesh Jha", "Thomas Reps",
    "Jonathan Anderson", "Robert N. M. Watson"]
-  "Developing practical but secure programs remains a difficult,
-  important, and open problem."
+  "<p>New operating systems, such as the Capsicum capability system,
+  allow a programmer to write an application that satisfies strong
+  security properties by invoking security- specific system calls at a
+  few key points in the program. However, rewriting an application to
+  invoke such system calls correctly is an error-prone process: even
+  the Capsicum developers have reported difficulties in rewriting
+  programs to correctly invoke system calls.</p>
+  <p>This paper describes capweave, a tool that takes as input (i) an
+  LLVM program, and (ii) declarative specifications of the
+  possibly-changing capabilities that a program must hold during its
+  execution, and rewrites the program to use Capsicum system calls to
+  enforce the policies. Our experiments demonstrate that capweave can
+  be applied to rewrite security-critical UNIX utilities to satisfy
+  practical security properties. capweave itself works quickly, and
+  the amount of runtime overhead incurred in the programs that
+  capweave produces is generally low for practical workloads.</p>"
   ["bob"];
 
-DB.addPaper
+LC.addPaper
   "Aura: A Programming Language for Authorization and Audit"
   ["Limin Jia", "Jeffrey A. Vaughan", "Karl Mazurak", "Jianzhou Zhao",
   "Luke Zarko", "Joseph Schorr", "Steve Zdancewic"]
-  "There can be no universal definition of security."
+  "This paper presents AURA, a programming language for access control
+  that treats ordinary programming constructs (e.g., integers and
+  recursive functions) and authorization logic constructs (e.g.,
+  principals and access control policies) in a uniform way. AURA is
+  based on polymorphic DCC and uses dependent types to permit
+  assertions that refer directly to AURA values while keeping
+  computation out of the assertion level to ensure tractability. The
+  main technical results of this paper include fully mechanically
+  verified proofs of the decidability and soundness for AURA's type
+  system, and a prototype typechecker and interpreter."
   [];
-  
-runServer port route DB;
+
+LC.addReview 1 "alice" "Interesting work!";
+
+LC.addReview 2 "alice" "Hmm, dependent types...";
+
+LC.addReview 1 "bob" "Hmm, IFC...";
+
+runServer port route LC;
 
 }
