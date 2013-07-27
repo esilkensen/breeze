@@ -3,49 +3,55 @@
 module LabelUtil
 interface
 {:
-  CNF = SeqOf (SeqOf Prin); // abbreviation
-  changeIntegrityTo : Auth => Alpha => CNF => Alpha;
-  changeSecrecyTo : Auth => Alpha => CNF => Alpha;
-  isLabeledWithSecrecy : Alpha => CNF => Bool;
-  isLabeledWithIntegrity : Alpha => CNF => Bool;
+  // Return whether the secrecy component of a value's label is equal
+  // to the given CNF formula.
+  hasSecrecy : Alpha => SeqOf (SeqOf Prin) => Bool;
+
+  // Return whether the integrity component of a value's label is
+  // equal to the given CNF formula.
+  hasIntegrity : Alpha => SeqOf (SeqOf Prin) => Bool;
+
+  // Set the secrecy component of a value's label to the given CNF
+  // formula, and return the relabeled value.
+  changeSecrecyTo : Auth => Alpha => SeqOf (SeqOf Prin) => Alpha;
+
+  // Set the integrity component of a value's label to the given CNF
+  // formula, and return the relabeled value.
+  changeIntegrityTo : Auth => Alpha => SeqOf (SeqOf Prin) => Alpha;
+
+  // Update both the pc and clearance by raising the secrecy and
+  // lowering the integrity by the given label. For example, if <S, I>
+  // is the current pc/clearance and <S', I'> is the input label, then
+  // the pc/clearance is set to <S /\ S', I /\ I'>.
   changeClrPcWith : Auth => Label => Unit;
 :}
 implementation
 {|
 
-// A function to change data's integrity.
+fun hasSecrecy x cnf = {
+  let (s, _) = reifyLabel (labelOf x);
+  (secrecyLabel s) == (secrecyLabel cnf)
+};
+
+fun hasIntegrity x cnf = {
+  let (_, i) = reifyLabel (labelOf x);
+  (integrityLabel i) == (integrityLabel cnf)
+};
+
 fun changeIntegrityTo auth x cnf = {
-  integrityLab = integrityLabelForJoin cnf;
-  newLab = (labelOf x `meet` topBottom) `join` integrityLab;
-  setLabel auth x newLab
+  let (s, _) = reifyLabel (labelOf x);
+  setLabel auth x (fullLabel s cnf)
 };
 
-// A function to change data's secrecy.
 fun changeSecrecyTo auth x cnf = {
-  secrecyLab = secrecyLabelForJoin cnf;
-  newLab = (labelOf x `meet` bottomTop) `join` secrecyLab;
-  setLabel auth x newLab
+  let (_, i) = reifyLabel (labelOf x);
+  setLabel auth x (fullLabel cnf i)
 };
 
-// Tells whether a value is labeled with the secrecy part given by the cnf.
-fun isLabeledWithSecrecy x cnf = {
-  lab = labelOf x;
-  (fullLabel cnf [[]] `below` lab) && (lab `below` fullLabel cnf [])
-};
-
-// Tells whether a value is labeled with the integrity part given by the cnf.
-fun isLabeledWithIntegrity x cnf = {
-  lab = labelOf x;
-  (fullLabel [] cnf `below` lab) && (lab `below` fullLabel [[]] cnf)
-};
-
-// Raise secrecy by lab's secrecy; lower integrity by lab's integrity
 fun changeClrPcWith auth lab = {
-  secrecyForJoin = lab `meet` topBottom;
-  integrityForMeet = lab `join` topBottom;
-  raiseClrAndPcBy auth secrecyForJoin;
-  setPc auth (getPc () `meet` integrityForMeet);
-  lowerClrTo (getClr () `meet` integrityForMeet);
+  raiseClrAndPcBy auth (lab `meet` topBottom);
+  setPc auth (getPc () `meet` (lab `join` topBottom));
+  lowerClrTo (getClr () `meet` (lab `join` topBottom));
 };
 
 |}

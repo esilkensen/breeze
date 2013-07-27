@@ -50,12 +50,19 @@ tests
 }
 implementation
 {|
+  Map = (import Map) Str.compare;
+
   open import LabelUtil {
-    changeIntegrityTo;
-    changeSecrecyTo;
-    isLabeledWithSecrecy;
-    isLabeledWithIntegrity;
-    changeClrPcWith;
+    hasSecrecy hasIntegrity changeSecrecyTo changeIntegrityTo
+    changeClrPcWith
+  };
+
+  l = newPrin "login";
+
+  loginLabel = fullLabel [[l.prin]] [[l.prin]];
+
+  fun setLoginClrPc _ = {
+    changeClrPcWith (l.pcAuth `with` l.clrAuth) loginLabel
   };
 
   // A very bad hash function.
@@ -68,120 +75,80 @@ implementation
     Str.stringOfHEX (convert (Str.concat salt password) 0)
   };
 
-// TODO -------------------------------------------------------------
-
-// The login principal and authorities
-let {| prin = loginP; clrAuth = loginClr; pcAuth = loginPc |} = newPrin "login";
-
-// The login label.
-loginLabel = fullLabel [[loginP]] [[loginP]];
-
-fun setLoginClrPc () : Unit = {
-  changeClrPcWith (loginPc `with` loginClr) loginLabel;
-};
-
-// Database of logins, salts, hashes.
-DB = {|
-  Map = (import Map) Str.compare;
-
-  // The reference that holds the database.
-  local db = {
-    setLoginClrPc (); // necessary to create the reference
+  // The reference to store salts, hashes, and user PrinRecordC's.
+  db = {
+    setLoginClrPc ();
     ref loginLabel Map.empty
-  } @ loginLabel;
-
-  local fun makeUserRecord username password salt = {
-    userRecord = newPrin username;
-    lab = {
-      userAndLogin = [[userRecord.prin], [loginP]];
-      fullLabel userAndLogin userAndLogin
-    };
-    (salt @ lab, (hash password salt) @ lab, userRecord);
-  };
+  }@loginLabel;
 
   fun register username password salt = {
-    _ = {
+    ignore {
       setLoginClrPc ();
-      userRecord = makeUserRecord username password salt;
-      db := Map.add username userRecord (!db);
+      u = newPrin username;
+      lab = fullLabel [[u.prin], [l.prin]] [[u.prin], [l.prin]];
+      userRecord = (salt@lab, (hash password salt)@lab, u);
+      db := Map.add username userRecord (!db)
     }@loginLabel;
-    // We ignore the result, which is always ()@loginLabel, and return
-    // a non labeled ().
-    ()
   };
 
-  fun lookup {username : String} = {
+  fun lookup {username:String} = {
     Map.find username (!db)
   };
-|};
 
-// The authentication service (A_U in the original example).
-fun AuthenticationService username password cL =
-  case DB.lookup username of {
-  | `Some (s, h, userPrinRec) => {
-      userP = userPrinRec.prin;
-      userClr = userPrinRec.clrAuth;
-      userPc = userPrinRec.pcAuth;
-      fun setUserClrPc () =
-        changeClrPcWith (userPc `with` userClr) (fullLabel [[userP]] [[userP]]);
-
-      // Cheking credentials.
-      hashLabel = fullLabel [[loginP], [userP]] [[loginP]];
-      isCorrect = {
-        raiseClrAndPcBy userClr (secrecyLabelForJoin [[userP]]);
-        h == (hash password s)
-      }@hashLabel;
-
-      // Endorsing credential test.
-      v = changeIntegrityTo userPc isCorrect [[userP], [loginP]];
-
-      // Closure with the user's privilege that declassifies data.
-      fun cAU v = {
-        // Verifies that u logged in successfully.
-        fun vU () = (v `isLabeledWithIntegrity` [[userP], [loginP]]) && v;
-
-        finalLabel = fullLabel [[userP], [loginP]] [];
-        res = {
-          setUserClrPc ();
-          if vU ()
-          then `Some userPrinRec
-          else `None
-        } @ finalLabel;
-        changeSecrecyTo userPc res [[loginP]];
+  fun login username password = {
+    fun cL userP v cAU = {
+      fun dL () = {
+        // Declassifies v to secrecy label [[u]] (leaves integrity unchanged).
+        test labelOf v ==>
+          fullLabel [[userP], [l.prin]] [[userP], [l.prin]];
+        v' = changeSecrecyTo l.pcAuth v [[userP]];
+        // Now, call cAU on the partially declassified value.
+        cAU v' // The privilege of cAU.
       };
 
-      { raiseClrBy userClr (secrecyLabelForJoin [[userP]]);
-        cL userP v cAU
-      } @ loginLabel;
-    }
-  | `None => `None
-};
-
-// The login service (L in the original example).
-fun login username password = {
-
-  fun cL userP v cAU = {
-
-    fun dL () = {
-    // Declassifies v to secrecy label [[u]] (leaves integrity unchanged).
-      test labelOf v ==>
-        fullLabel [[userP], [loginP]] [[userP], [loginP]];
-      v' = changeSecrecyTo loginPc v [[userP]];
-      // Now, call cAU on the partially declassified value.
-      cAU v' // The privilege of cAU.
+      userAuth = dL ();
+      if userAuth `hasSecrecy` [[l.prin]]
+      then changeIntegrityTo l.pcAuth userAuth [[l.prin]]
+      else userAuth
     };
 
-    userAuth = dL ();
-    if userAuth `isLabeledWithSecrecy` [[loginP]]
-    then changeIntegrityTo loginPc userAuth [[loginP]]
-    else userAuth
-  };
+    case lookup username of {
+      | `Some (s, h, u) => {
+          fun setUserClrPc () = {
+            changeClrPcWith (u.pcAuth `with` u.clrAuth)
+                            (fullLabel [[u.prin]] [[u.prin]])
+          };
 
-  (AuthenticationService username@loginLabel password@loginLabel
-  cL)@loginLabel
-};
+          // Cheking credentials.
+          hashLabel = fullLabel [[l.prin], [u.prin]] [[l.prin]];
+          correct = {
+	    raiseClrAndPcBy u.clrAuth (fullLabel [[u.prin]] [[]]);
+            h == (hash password s)
+          }@hashLabel;
 
-register = DB.register;
+          // Endorsing credential test.
+          v = changeIntegrityTo u.pcAuth correct [[u.prin], [l.prin]];
+
+          // Closure with the user's privilege that declassifies data.
+          fun cAU v = {
+            // Verifies that u logged in successfully.
+            fun vU () = (v `hasIntegrity` [[u.prin], [l.prin]]) && v;
+
+            finalLabel = fullLabel [[u.prin], [l.prin]] [];
+            res = {
+              setUserClrPc ();
+              if vU () then `Some u else `None
+            }@finalLabel;
+            changeSecrecyTo u.pcAuth res [[l.prin]];
+          };
+
+          { raiseClrBy u.clrAuth (secrecyLabelForJoin [[u.prin]]);
+            cL u.prin v cAU
+          }@loginLabel;
+        }
+      | `None => `None
+    }
+  }@loginLabel;
 
 |}
 
