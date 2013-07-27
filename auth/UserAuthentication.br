@@ -9,7 +9,7 @@ interface
   // A DC label <L, L> where L is a principal for the login client.
   loginLabel : Label;
 
-  // Set the clearance and pc to loginLabel.
+  // Set the clearance/pc = <S, I> to <S /\ L, I /\ L>.
   setLoginClrPc : Unit => Unit;
 
   // Given a username and password, attempt to authenticate the user
@@ -29,7 +29,7 @@ tests
   fun testLogin {username:String} {password:String} {success:Bool} = {
     result = {
       setLoginClrPc ();
-      case (login username password) of {
+      case login username password of {
         | `Some {| pcAuth=pcAuth; clrAuth=clrAuth |} =>
             (pcAuth <> emptyAuth) && (clrAuth <> emptyAuth)
         | `None => false
@@ -57,15 +57,6 @@ implementation
     changeClrPcWith
   };
 
-  l = newPrin "login";
-
-  loginLabel = fullLabel [[l.prin]] [[l.prin]];
-
-  fun setLoginClrPc _ = {
-    changeClrPcWith (l.pcAuth `with` l.clrAuth) loginLabel
-  };
-
-  // A very bad hash function.
   fun hash {password:String} {salt:String} : String = {
     rec fun convert {s:String} {acc:Int} : Int = {
       d = Str.decompose s;
@@ -75,7 +66,14 @@ implementation
     Str.stringOfHEX (convert (Str.concat salt password) 0)
   };
 
-  // The reference to store salts, hashes, and user PrinRecordC's.
+  l = newPrin "login";
+
+  loginLabel = fullLabel [[l.prin]] [[l.prin]];
+
+  fun setLoginClrPc _ = {
+    changeClrPcWith (l.pcAuth `with` l.clrAuth) loginLabel;
+  };
+
   db = {
     setLoginClrPc ();
     ref loginLabel Map.empty
@@ -91,30 +89,11 @@ implementation
     }@loginLabel;
   };
 
-  fun lookup {username:String} = {
-    Map.find username (!db)
-  };
-
   fun login username password = {
-    fun cL userP v cAU = {
-      fun dL () = {
-        // Declassifies v to secrecy label [[u]] (leaves integrity unchanged).
-        test labelOf v ==>
-          fullLabel [[userP], [l.prin]] [[userP], [l.prin]];
-        v' = changeSecrecyTo l.pcAuth v [[userP]];
-        // Now, call cAU on the partially declassified value.
-        cAU v' // The privilege of cAU.
-      };
-
-      userAuth = dL ();
-      if userAuth `hasSecrecy` [[l.prin]]
-      then changeIntegrityTo l.pcAuth userAuth [[l.prin]]
-      else userAuth
-    };
-
-    case lookup username of {
+    case Map.find username (!db) of {
       | `Some (s, h, u) => {
-          fun setUserClrPc () = {
+          // Set the clearance/pc = <S, I> to <S /\ U, I /\ U>.
+          fun setUserClrPc _ = {
             changeClrPcWith (u.pcAuth `with` u.clrAuth)
                             (fullLabel [[u.prin]] [[u.prin]])
           };
@@ -122,7 +101,7 @@ implementation
           // Cheking credentials.
           hashLabel = fullLabel [[l.prin], [u.prin]] [[l.prin]];
           correct = {
-	    raiseClrAndPcBy u.clrAuth (fullLabel [[u.prin]] [[]]);
+            raiseClrAndPcTo u.clrAuth hashLabel;
             h == (hash password s)
           }@hashLabel;
 
@@ -131,24 +110,26 @@ implementation
 
           // Closure with the user's privilege that declassifies data.
           fun cAU v = {
-            // Verifies that u logged in successfully.
-            fun vU () = (v `hasIntegrity` [[u.prin], [l.prin]]) && v;
-
             finalLabel = fullLabel [[u.prin], [l.prin]] [];
             res = {
               setUserClrPc ();
-              if vU () then `Some u else `None
+              if (v `hasIntegrity` [[u.prin], [l.prin]]) && v
+              then `Some u else `None
             }@finalLabel;
             changeSecrecyTo u.pcAuth res [[l.prin]];
           };
 
           { raiseClrBy u.clrAuth (secrecyLabelForJoin [[u.prin]]);
-            cL u.prin v cAU
+            v' = changeSecrecyTo l.pcAuth v [[u.prin]];
+            userAuth = cAU v';
+            if userAuth `hasSecrecy` [[l.prin]]
+            then changeIntegrityTo l.pcAuth userAuth [[l.prin]]
+            else userAuth
           }@loginLabel;
         }
-      | `None => `None
+      | `None => `None@loginLabel
     }
-  }@loginLabel;
+  };
 
 |}
 
