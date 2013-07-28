@@ -1,0 +1,31 @@
+{
+
+module Util
+interface
+{:
+  andPrin : Label => Prin => Label;
+
+  declassify : Auth => Alpha => Prin => Alpha;
+  
+  endorse : Auth => Alpha => Prin => Alpha;
+:}
+implementation
+{|
+  fun andPrin lab prin = {
+    let (s, _) = reifyLabel (lab `join` secrecyLabel [[prin]]);
+    let (_, i) = reifyLabel (lab `meet` integrityLabel [[prin]]);
+    fullLabel s i
+  };
+
+  fun declassify auth val prin = {
+    setLabel auth val (dropPrinSecrecyDown prin (labelOf val))
+  };
+
+  fun endorse auth val prin = {
+    let (s, _) = reifyLabel (labelOf val);
+    let (_, i) = reifyLabel (labelOf val `meet` integrityLabel [[prin]]);
+    setLabel auth val (fullLabel s i)
+  };
+|}
+
+}
