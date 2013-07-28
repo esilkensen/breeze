@@ -26,7 +26,7 @@ tests
       setLoginClrPc ();
       case login username password of {
         | `Some u => (u.pcAuth <> emptyAuth) && (u.clrAuth <> emptyAuth)
-	| `None => false
+        | `None => false
       }
     }@loginLabel;
     test result ==> success@loginLabel;
