@@ -83,9 +83,9 @@ implementation
     ignore {
       setLoginClrPc ();
       u = newPrin username;
-      lab = fullLabel [[u.prin], [l.prin]] [[u.prin], [l.prin]];
+      lab = fullLabel [[l.prin], [u.prin]] [[l.prin], [u.prin]];
       userRecord = (salt@lab, (hash password salt)@lab, u);
-      db := Map.add username userRecord (!db)
+      db := Map.add username userRecord (!db);
     }@loginLabel;
   };
 
@@ -95,33 +95,25 @@ implementation
           // Set the clearance/pc = <S, I> to <S /\ U, I /\ U>.
           fun setUserClrPc _ = {
             changeClrPcWith (u.pcAuth `with` u.clrAuth)
-                            (fullLabel [[u.prin]] [[u.prin]])
+                            (fullLabel [[u.prin]] [[u.prin]]);
           };
 
-          // Cheking credentials.
-          hashLabel = fullLabel [[l.prin], [u.prin]] [[l.prin]];
-          correct = {
-            raiseClrAndPcTo u.clrAuth hashLabel;
+	  hashLabel = labelOf h;
+          v = {
+	    setUserClrPc ();
             h == (hash password s)
           }@hashLabel;
 
-          // Endorsing credential test.
-          v = changeIntegrityTo u.pcAuth correct [[u.prin], [l.prin]];
-
-          // Closure with the user's privilege that declassifies data.
-          fun cAU v = {
-            finalLabel = fullLabel [[u.prin], [l.prin]] [];
-            res = {
-              setUserClrPc ();
-              if (v `hasIntegrity` [[u.prin], [l.prin]]) && v
-              then `Some u else `None
-            }@finalLabel;
-            changeSecrecyTo u.pcAuth res [[l.prin]];
-          };
-
-          { raiseClrBy u.clrAuth (secrecyLabelForJoin [[u.prin]]);
+          { 
+            raiseClrBy u.clrAuth (secrecyLabelForJoin [[u.prin]]);
             v' = changeSecrecyTo l.pcAuth v [[u.prin]];
-            userAuth = cAU v';
+	    finalLabel = fullLabel [[u.prin], [l.prin]] [];
+	    res = {
+              setUserClrPc ();
+	      if (v' `hasIntegrity` [[u.prin], [l.prin]]) && v
+	      then `Some u else `None
+	    }@finalLabel;
+	    userAuth = changeSecrecyTo u.pcAuth res [[l.prin]];
             if userAuth `hasSecrecy` [[l.prin]]
             then changeIntegrityTo l.pcAuth userAuth [[l.prin]]
             else userAuth

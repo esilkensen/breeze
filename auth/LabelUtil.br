@@ -24,6 +24,8 @@ interface
   // is the current pc/clearance and <S', I'> is the input label, then
   // the pc/clearance is set to <S /\ S', I /\ I'>.
   changeClrPcWith : Auth => Label => Unit;
+
+  andPrin : Label => Prin => Label;
 :}
 implementation
 {|
@@ -52,6 +54,12 @@ fun changeClrPcWith auth lab = {
   raiseClrAndPcBy auth (lab `meet` topBottom);
   setPc auth (getPc () `meet` (lab `join` topBottom));
   lowerClrTo (getClr () `meet` (lab `join` topBottom));
+};
+
+fun andPrin lab prin = {
+  let (s, _) = reifyLabel (lab `join` secrecyLabel [[prin]]);
+  let (_, i) = reifyLabel (lab `meet` integrityLabel [[prin]]);
+  fullLabel s i
 };
 
 |}

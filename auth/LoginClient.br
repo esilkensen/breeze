@@ -1,0 +1,68 @@
+{
+
+open import AsciiArt { (@=) };
+
+module LoginClient
+interface
+{:
+  loginLabel : Label;
+  
+  setLoginClrPc : Unit => Unit;
+  
+  register : String => String => String => (Unit@=loginLabel);
+
+  login : String => String => ((OptOf PrinRecordC)@=loginLabel);
+:}
+tests
+{
+  open LoginClient { loginLabel setLoginClrPc register login };
+
+  ignore {
+    setLoginClrPc ();
+    test register "Iron Man"     "I fear rust!"      "908CA" ==> ()@loginLabel;
+    test register "Breeze Rider" "Blows my mind..."  "56F2E" ==> ()@loginLabel;
+    test register "Haskell Fan"  "Gosh, I'm so lazy" "D6830" ==> ()@loginLabel;
+
+    test login "Iron Man" "I fear rust!" ==> ?;
+  }@loginLabel;
+}
+implementation
+{|
+  Map = (import Map) Str.compare;
+
+  open import LabelUtil { changeClrPcWith };
+  open import AuthenticationService { makeUserRecord authenticate };
+
+  l = newPrin "L";
+
+  loginLabel = fullLabel [[l.prin]] [[l.prin]];
+
+  fun setLoginClrPc _ = {
+    changeClrPcWith (l.pcAuth `with` l.clrAuth) loginLabel;
+  };
+  
+  db = {
+    setLoginClrPc ();
+    ref loginLabel Map.empty
+  }@loginLabel;
+
+  fun register username password salt = {
+    setLoginClrPc ();
+    usr = makeUserRecord username password@loginLabel salt@loginLabel;
+    db := Map.add username usr (!db);
+  }@loginLabel;
+
+  fun login username password = {
+    setLoginClrPc ();
+    case Map.find username (!db) of {
+      | `Some usr => {
+          ignore (authenticate password usr);
+	  `None
+        }
+      | `None => `None
+    }
+  }@loginLabel;
+
+|}
+
+}

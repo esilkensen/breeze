@@ -1,0 +1,46 @@
+{
+
+open import AsciiArt { (@=) };
+
+module AuthenticationService
+interface
+{:
+  makeUserRecord : String => String => String => Any;
+
+  authenticate : Any => Any;
+:}
+tests
+{
+  test 1 ==> 1;
+}
+implementation
+{|
+  open import LabelUtil { andPrin };
+
+  fun hash {password:String} {salt:String} : String = {
+    rec fun convert {s:String} {acc:Int} : Int = {
+      d = Str.decompose s;
+      if d.empty then acc
+      else convert d.rest (((Str.ord d.char) + 10 * acc) `mod` 999991)
+    };
+    Str.stringOfHEX (convert (Str.concat salt password) 0)
+  };
+
+  fun makeUserRecord username password salt = {
+    u = newPrin username;
+    h = hash password salt;
+    lab = (labelOf password `join` labelOf salt) `andPrin` u.prin;
+    (salt@lab, h@lab, u)
+  };
+
+  fun authenticate password usr = {
+    let (salt, h, u) = usr;
+    test password ==> ?;
+    test salt ==> ?;
+    test h ==> ?;
+    test u ==> ?;
+  };
+
+|}
+
+}
