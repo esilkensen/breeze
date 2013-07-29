@@ -1,6 +1,5 @@
 {
 
-open import AsciiArt { (@=) };
 open import Tuple { TupleC };
 
 // This module implements the authentication service (A), which is in
@@ -17,7 +16,7 @@ interface
   makeUserRecord : String => String => String => TupleC;
 
   // Alpha = Bool, but to check this is an IFC violation.
-  local Cont = Alpha => (Alpha => Alpha) => Alpha;
+  local Cont = Alpha => (Alpha => OptOf PrinRecordC) => OptOf PrinRecordC;
 
   // Given a password and a user record, check whether the password is
   // correct, and if so, return the user's corresponding PrinRecordC. The
@@ -31,6 +30,7 @@ implementation
 
   // A very bad hash function.
   fun hash {password:String} {salt:String} : String = {
+    // Convert string to integer in Z999991/Z (using Horner's Rule).
     rec fun convert {s:String} {acc:Int} : Int = {
       d = Str.decompose s;
       if d.empty then acc
