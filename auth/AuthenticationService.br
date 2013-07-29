@@ -3,17 +3,33 @@
 open import AsciiArt { (@=) };
 open import Tuple { TupleC };
 
+// This module implements the authentication service (A), which is in
+// mutual distrust with the login client (L): L does not trust A with the
+// user's password, while A does not trust L to grant the user's authority
+// without first verifying credentials. L calls on A to implement the User
+// Authentication example from the Disjunction Category Labels paper.
+
 module AuthenticationService
 interface
 {:
+  // Given a username, password, and salt, return a tuple of the salt, a
+  // salted hash of the password, and a PrinRecordC for the user.
   makeUserRecord : String => String => String => TupleC;
 
-  authenticate :  String => TupleC => (Any => Any => Any) => OptOf PrinRecordC;
+  // Alpha = Bool, but to check this is an IFC violation.
+  local Cont = Alpha => (Alpha => Alpha) => Alpha;
+
+  // Given a password and a user record, check whether the password is
+  // correct, and if so, return the user's corresponding PrinRecordC. The
+  // continuation coordinates the declassification of the password-check
+  // result with the login client.
+  authenticate :  String => TupleC => Cont => OptOf PrinRecordC;
 :}
 implementation
 {|
   open import Util { andPrin declassify endorse };
 
+  // A very bad hash function.
   fun hash {password:String} {salt:String} : String = {
     rec fun convert {s:String} {acc:Int} : Int = {
       d = Str.decompose s;
@@ -26,6 +42,7 @@ implementation
   fun makeUserRecord username password salt = {
     u = newPrin username;
     h = hash password salt;
+    // add U to secrecy and integrity: <L, L> ==> <L /\ U, L /\ U>
     lab = (labelOf password `join` labelOf salt) `andPrin` u.prin;
     (salt@lab, h@lab, u)
   };
@@ -42,7 +59,6 @@ implementation
     v = endorse u.pcAuth isCorrect u.prin;
     cL v cAU
   };
-
 |}
 
 }

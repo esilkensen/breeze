@@ -3,10 +3,13 @@
 module Util
 interface
 {:
+  // Given <S, I> and P, return <S /\ P, I /\ P>.
   andPrin : Label => Prin => Label;
 
+  // Given v@<S /\ P, I> and P, return v@<S, I>.
   declassify : Auth => Alpha => Prin => Alpha;
   
+  // Given v@<S, I> and P, return v@<S, I /\ P>.
   endorse : Auth => Alpha => Prin => Alpha;
 :}
 implementation
@@ -17,14 +20,14 @@ implementation
     fullLabel s i
   };
 
-  fun declassify auth val prin = {
-    setLabel auth val (dropPrinSecrecyDown prin (labelOf val))
+  fun declassify auth v prin = {
+    setLabel auth v (dropPrinSecrecyDown prin (labelOf v))
   };
 
-  fun endorse auth val prin = {
-    let (s, _) = reifyLabel (labelOf val);
-    let (_, i) = reifyLabel (labelOf val `meet` integrityLabel [[prin]]);
-    setLabel auth val (fullLabel s i)
+  fun endorse auth v prin = {
+    let (s, _) = reifyLabel (labelOf v);
+    let (_, i) = reifyLabel (labelOf v `meet` integrityLabel [[prin]]);
+    setLabel auth v (fullLabel s i)
   };
 |}
 

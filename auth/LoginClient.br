@@ -1,20 +1,31 @@
 {
 
-open import AsciiArt { (@=) };
+open import AsciiArt { (@=) (@<=) };
+
+// This module implements User Authentication example from Section 5.2
+// in Disjunction Category Labels (Stefan et al. Nordsec '11).
+// http://www.scs.stanford.edu/~deian/pubs//stefan:2011:dclabels.pdf
 
 module LoginClient
 interface
 {:
+  // A DC label <L, L> where L is a principal for the login client.
   loginLabel : Label;
   
-  // Update both the pc and clearance by raising the secrecy and
-  // lowering the integrity by the given label. For example, if <S, I>
-  // is the current pc/clearance and <S', I'> is the input label, then
-  // the pc/clearance is set to <S /\ S', I /\ I'>.
+  // Update both the pc and clearance by raising the secrecy and lowering
+  // the integrity by the login principal L. For example, if <S, I> is the
+  // current pc/clearance, then the pc/clearance becomes <S /\ L, I /\ L>.
   setLoginClrPc : Unit => Unit;
-  
+
+  // Given a username, password, and salt, create a corresponding record
+  // and store it in the database.
   register : String => String => String => Unit;
 
+  // Given a username and password, attempt to authenticate the user and
+  // return an OptOf PrinRecordC labeled with the login client's label.
+  // The return value is `None when the username is invalid; if the login
+  // is successful, then the clrAuth and pcAuth fields of the PrinRecordC
+  // represent the user's (nonempty) granted authority.
   login : String => String => ((OptOf PrinRecordC)@=loginLabel);
 :}
 tests
@@ -39,8 +50,8 @@ tests
   testLogin "Iron Man"     "I fear rust!"       true;
   testLogin "Breeze Rider" "Blows my mind..."   true;
   testLogin "Haskell Fan"  "Gosh, I'm so lazy"  true;
-  testLogin "Iron Man"     "I don't fear rust!" false;
-  testLogin "The Dude"     ""                   false;
+  testLogin "Iron Man"     "I don't fear rust!" false; // bad password
+  testLogin "The Dude"     ""                   false; // bad username
 }
 implementation
 {|
@@ -59,7 +70,7 @@ implementation
     setPc auth (getPc () `meet` (loginLabel `join` topBottom));
     lowerClrTo (getClr () `meet` (loginLabel `join` topBottom));
   };
-  
+
   db = {
     setLoginClrPc ();
     ref loginLabel Map.empty
@@ -74,7 +85,7 @@ implementation
   };
 
   fun login username password = {
-    fun cL v cAU = {
+    fun cL v {cAU:Alpha => (Alpha@<=loginLabel)} = {
       cAU (declassify l.pcAuth v l.prin)
     };
     setLoginClrPc ();
@@ -83,7 +94,6 @@ implementation
       | `None => `None
     }
   }@loginLabel;
-
 |}
 
 }
