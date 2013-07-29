@@ -55,10 +55,7 @@ tests
 }
 implementation
 {|
-  Map = (import Map) Str.compare;
-
   open import Util { declassify };
-  open import AuthenticationService { makeUserRecord authenticate };
 
   l = newPrin "L";
 
@@ -71,28 +68,21 @@ implementation
     lowerClrTo (getClr () `meet` (loginLabel `join` topBottom));
   };
 
-  db = {
-    setLoginClrPc ();
-    ref loginLabel Map.empty
-  }@loginLabel;
+  open ((import AuthenticationService) loginLabel setLoginClrPc) {
+    addUser authenticate
+  };
 
   fun register username password salt = {
     ignore {
       setLoginClrPc ();
-      usr = makeUserRecord username password@loginLabel salt@loginLabel;
-      db := Map.add username usr (!db);
+      addUser username password@loginLabel salt@loginLabel;
     }@loginLabel;
   };
 
   fun login username password = {
-    fun cL v {cAU:Alpha => (Alpha@<=loginLabel)} = {
-      cAU (declassify l.pcAuth v l.prin)
-    };
     setLoginClrPc ();
-    case Map.find username (!db) of {
-      | `Some usr => authenticate password@loginLabel usr cL
-      | `None => `None
-    }
+    cL = \v cAU => cAU (declassify l.pcAuth v l.prin);
+    authenticate username password@loginLabel cL
   }@loginLabel;
 |}
 
