@@ -1,7 +1,5 @@
 {
 
-open import AsciiArt { (@=) (@<=) };
-
 // This module implements User Authentication example from Section 5.2
 // in Disjunction Category Labels (Stefan et al. Nordsec '11).
 // http://www.scs.stanford.edu/~deian/pubs//stefan:2011:dclabels.pdf
@@ -9,81 +7,71 @@ open import AsciiArt { (@=) (@<=) };
 module LoginClient
 interface
 {:
-  // A DC label <L, L> where L is a principal for the login client.
-  loginLabel : Label;
-  
-  // Update both the pc and clearance by raising the secrecy and lowering
-  // the integrity by the login principal L. For example, if <S, I> is the
-  // current pc/clearance, then the pc/clearance becomes <S /\ L, I /\ L>.
-  setLoginClrPc : Unit => Unit;
-
   // Given a username, password, and salt, create a corresponding record
   // and store it in the database.
   register : String => String => String => Unit;
 
   // Given a username and password, attempt to authenticate the user and
-  // return an OptOf PrinRecordC labeled with the login client's label.
-  // The return value is `None when the username is invalid; if the login
-  // is successful, then the clrAuth and pcAuth fields of the PrinRecordC
-  // represent the user's (nonempty) granted authority.
-  login : String => String => ((OptOf PrinRecordC)@=loginLabel);
+  // return an OptOf PrinRecordC. If the login is successful, then the
+  // clrAuth and pcAuth fields of the PrinRecordC are nonempty, giving the
+  // user's granted authority.
+  login : String => String => (OptOf PrinRecordC)
 :}
 tests
 {
-  open LoginClient { loginLabel setLoginClrPc register login };
+  open LoginClient { register login };
 
-  fun testLogin {username:String} {password:String} {success:Bool} = {
-    result = {
-      setLoginClrPc ();
-      case login username password of {
-        | `Some u => (u.pcAuth <> emptyAuth) && (u.clrAuth <> emptyAuth)
-        | `None => false
-      }
-    }@loginLabel;
-    test result ==> success@loginLabel;
+  fun loginSuccess {username:String} {password:String} : Bool = {
+    case (login username password) of {
+      | `Some u => (u.pcAuth <> emptyAuth) && (u.clrAuth <> emptyAuth)
+      | `None => false
+    };
   };
   
   register "Iron Man"     "I fear rust!"      "908CA";
   register "Breeze Rider" "Blows my mind..."  "56F2E";
   register "Haskell Fan"  "Gosh, I'm so lazy" "D6830";
 
-  testLogin "Iron Man"     "I fear rust!"       true;
-  testLogin "Breeze Rider" "Blows my mind..."   true;
-  testLogin "Haskell Fan"  "Gosh, I'm so lazy"  true;
-  testLogin "Iron Man"     "I don't fear rust!" false; // bad password
-  testLogin "The Dude"     ""                   false; // bad username
+  test loginSuccess "Iron Man"     "I fear rust!"       ==> true;
+  test loginSuccess "Breeze Rider" "Blows my mind..."   ==> true;
+  test loginSuccess "Haskell Fan"  "Gosh, I'm so lazy"  ==> true;
+  test loginSuccess "Iron Man"     "I don't fear rust!" ==> false;
+  test loginSuccess "The Dude"     ""                   ==> false;
 }
 implementation
 {|
   open import Util { declassify };
+  
+  newAuthenticationService = import AuthenticationService;
 
   l = newPrin "L";
 
   loginLabel = fullLabel [[l.prin]] [[l.prin]];
 
+  // Update both the pc and clearance by raising the secrecy and lowering
+  // the integrity by the login principal L. For example, if <S, I> is the
+  // current pc/clearance, then the pc/clearance becomes <S /\ L, I /\ L>.
   fun setLoginClrPc _ = {
     auth = l.pcAuth `with` l.clrAuth;
+    // topBottom = <False, False>
     raiseClrAndPcBy auth (loginLabel `meet` topBottom);
     setPc auth (getPc () `meet` (loginLabel `join` topBottom));
     lowerClrTo (getClr () `meet` (loginLabel `join` topBottom));
   };
 
-  open ((import AuthenticationService) loginLabel setLoginClrPc) {
+  open (newAuthenticationService loginLabel setLoginClrPc) {
     addUser authenticate
   };
 
   fun register username password salt = {
-    ignore {
-      setLoginClrPc ();
-      addUser username password@loginLabel salt@loginLabel;
-    }@loginLabel;
+    addUser username password@loginLabel salt@loginLabel
   };
 
   fun login username password = {
-    setLoginClrPc ();
     cL = \v cAU => cAU (declassify l.pcAuth v l.prin);
-    authenticate username password@loginLabel cL
-  }@loginLabel;
+    result = authenticate username password@loginLabel cL;
+    (declassify l.pcAuth result l.prin)@public
+  };
 |}
 
 }

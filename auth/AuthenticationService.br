@@ -5,14 +5,13 @@ interface Label => (Unit => Unit) =>
 {:
   // Given a username, password, and salt, create and store a tuple of the
   // salt, a salted hash of the password, and a PrinRecordC for the user.
-  addUser : String => String => String => Unit;
+  addUser : String => Alpha => Alpha => Unit;
 
-  // Alpha = Bool, but to check this is an IFC violation.
-  local Cont = Alpha => (Alpha => OptOf PrinRecordC) => OptOf PrinRecordC;
+  local Cont = Alpha => (Alpha => Beta) => Beta;
 
   // Given a username and password, check whether the password is correct,
   // and if so, return the user's corresponding PrinRecordC.
-  authenticate :  String => String => Cont => OptOf PrinRecordC;
+  authenticate :  String => Alpha => Cont => Beta;
 :}
 implementation \loginLabel setLoginClrPc =>
 {|
@@ -24,9 +23,7 @@ implementation \loginLabel setLoginClrPc =>
     ref loginLabel Map.empty
   }@loginLabel;
 
-  // A very bad hash function.
   fun hash {password:String} {salt:String} : String = {
-    // Convert string to integer in Z999991/Z (using Horner's Rule).
     rec fun convert {s:String} {acc:Int} : Int = {
       d = Str.decompose s;
       if d.empty then acc
@@ -36,20 +33,24 @@ implementation \loginLabel setLoginClrPc =>
   };
 
   fun addUser username password salt = {
+    u = newPrin username;
+    hashLab = (labelOf password) `join` (labelOf salt);
+    h = {
+      setLoginClrPc ();
+      hash password salt
+    }@hashLab;
+    lab = hashLab `andPrin` u.prin;
     ignore {
       setLoginClrPc ();
-      u = newPrin username;
-      h = hash password salt;
-      // add U to secrecy and integrity: <L, L> ==> <L /\ U, L /\ U>
-      lab = (labelOf password `join` labelOf salt) `andPrin` u.prin;
-      db := Map.add username (salt@lab, h@lab, u) (!db);
+      db := Map.add username (salt@lab, h@lab, u) (!db)
     }@loginLabel;
   };
 
   fun authenticate username password cL = {
+    setLoginClrPc ();
     case (Map.find username (!db)) of {
       | `Some (salt, h, u) => {
-          hashLab = labelOf password `join` labelOf salt;
+          hashLab = (labelOf password) `join` (labelOf salt);
           isCorrect = {
             raiseClrAndPcTo u.clrAuth hashLab;
             h == (hash password salt)
@@ -60,7 +61,7 @@ implementation \loginLabel setLoginClrPc =>
         }
       | `None => `None
     };
-  };
+  }@loginLabel;
 |}
 
 }
