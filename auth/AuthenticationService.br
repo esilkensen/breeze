@@ -33,15 +33,12 @@ implementation \loginLabel setLoginClrPc =>
   };
 
   fun addUser username password salt = {
-    u = newPrin username;
-    h = {
-      setLoginClrPc ();
-      hash password salt
-    }@loginLabel;
     ignore {
       setLoginClrPc ();
+      u = newPrin username;
+      h = hash password salt;
       lab = loginLabel `andPrin` u.prin;
-      db := Map.add username (salt@lab, h@lab, u) (!db)
+      db := Map.add username (salt@lab, h@lab, u) (!db);
     }@loginLabel;
   };
 
