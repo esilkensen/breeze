@@ -1,0 +1,52 @@
+{
+
+open import AsciiArt { (@=) };
+
+module MDA
+interface
+{:
+  labelA : Label;
+
+  run : (String@=public) => (String@=labelA);
+:}
+tests
+{
+  open MDA { labelA run };
+
+  fun testMDA msg spam = {
+    delivered = Str.Printf.sprintf "%s\n-- RECEIVED\n-- %s\n-- FILTERED";
+    test run msg@public ==> (delivered msg spam)@labelA;
+  };
+
+  testMDA "Rolex Viagra" "SPAM";
+  testMDA "Hey, what's up?\n-- Anne O'Neam" "HAM";
+}
+implementation
+{|
+  a = newPrin "A";
+  r = newPrin "#R";
+  s = newPrin "#S";
+
+  labelA = fullLabel [[a.prin]] [[a.prin]];
+  labelAR = integrityLabel [[a.prin, r.prin]];
+  labelARS = integrityLabel [[a.prin, r.prin], [a.prin, s.prin]];
+
+  fun receive msg = {
+    (msg `Str.concat` "\n-- RECEIVED")@labelAR
+  };
+
+  fun filter msg = {
+    spam = Str.stringStartsWith msg "Rolex Viagra";
+    (msg `Str.concat` (if spam then "\n-- SPAM" else "\n-- HAM"))@labelARS
+  };
+
+  fun forward msg = {
+    (msg `Str.concat` "\n-- FILTERED")@labelA
+  };
+
+  fun run msg = {
+    forward (filter (receive msg))
+  };
+|}
+
+}
