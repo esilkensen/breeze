@@ -68,7 +68,16 @@ implementation
   };
 
   fun login username password = {
-    cL = \v cAU => cAU (declassify l.pcAuth v l.prin);
+    cL = \v cAU => {
+      v' = (declassify l.pcAuth v l.prin);
+      lab = labelOf v';
+      putStr "pc ==> "; test getPc () ==> ?;    // <L, L>
+      putStr "vLab ==> "; test labelOf v ==> ?; //
+      putStr "lab ==> "; test lab ==> ?;        // <U, U /\ L>
+      putStr "clr ==> "; test getClr () ==> ?;  // <L, L>
+      test getPc () `below` lab ==> ?;
+      cAU true@lab // malicious cL
+    };
     result = authenticate username password@loginLabel cL;
     (declassify l.pcAuth result l.prin)@public
   };

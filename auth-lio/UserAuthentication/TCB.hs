@@ -4,6 +4,7 @@ module UserAuthentication.TCB (
     login
   , authenticate
   , register
+  , dcPutStrLnTCB
   ) where
 
 import Data.Char
@@ -15,6 +16,10 @@ import LIO.TCB
 import LIO.DCLabel
 import LIO.LIORef
 
+-- | Print to standard output
+dcPutStrLnTCB :: String -> DC ()
+dcPutStrLnTCB = ioTCB . putStrLn
+
 hash password salt =
     let convert [] acc = acc
         convert (c:cs) acc = convert cs (((ord c) + (10 * acc)) `mod` 999991)
@@ -25,12 +30,14 @@ loginLabel = "L" %% "L"
 db = newLIORef loginLabel Map.empty
 
 makeUserRecord username password salt = do
+  dcPutStrLnTCB "makeUserRecord"
   let lab = (username /\ "L") %% (username /\ "L")
-  s <- label lab salt
+  s <- labelP lab salt
   h <- label lab (hash password salt)
   return (s, h, PrivTCB username)
 
 register username password salt = do
+  dcPutStrLnTCB "register"
   usr <- makeUserRecord username password salt
   (\db -> modifyLIORef db (\m -> Map.insert username usr m)) =<< db
 

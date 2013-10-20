@@ -52,7 +52,11 @@ implementation \loginLabel setLoginClrPc =>
             h == (hash password salt)
           }@hashLab;
           v = endorse u.pcAuth isCorrect u.prin;
-          cL v (\v' => if (declassify u.pcAuth v' u.prin)
+	  putStr "before! pc ==> ";  test getPc () ==> ?;
+	  putStr "before! clr ==> "; test getClr () ==> ?;
+          cL v (\v' => if (labelOf v `join` topBottom ==
+	                   labelOf v' `join` topBottom) &&
+                          (declassify u.pcAuth v' u.prin)
                        then `Some u else `None)
         }
       | `None => `None
